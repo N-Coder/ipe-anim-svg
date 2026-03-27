@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ipe SVG Presentation</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+        #presentation-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        svg {
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .page-container, [class^="layer-"] {
+            transition: opacity 0.5s ease-in-out;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+        button {
+            padding: 5px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background: #fff;
+        }
+        button:hover {
+            background: #eee;
+        }
+        #info {
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        input[type="number"] {
+            width: 40px;
+            padding: 3px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            text-align: center;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body>
+    <div id="presentation-container"></div>
+    <div id="controls">
+        <button id="prev">Previous</button>
+        <div id="info">
+            Page <input type="number" id="page-input" min="1" value="1"> / <span id="page-total">1</span>,
+            View <input type="number" id="view-input" min="1" value="1"> / <span id="view-total">1</span>
+        </div>
+        <button id="next">Next</button>
+    </div>
+
+    <script>
+        let presentationData = [];
+        let currentPage = 0;
+        let currentView = 1;
+
+        // Custom transitions configuration
+        const customTransitions = [
+            {
+                page: 1, // Page index 1 (Page 2)
+                view: 2, // View index 2
+                selector: ".layer-kappa",
+                refA: ".custom-refA",
+                refB: ".custom-refB",
+                type: "align" // align refA's center with refB's center
+            }
+        ];
+
+        async function init() {
+            try {
+                // Load metadata
+                const infoResponse = await fetch('example_info.json');
+                presentationData = await infoResponse.json();
+
+                // Load SVG
+                const svgText = await d3.text('example.svg');
+                const container = d3.select("#presentation-container");
+                container.html(svgText);
+
+                const svg = container.select("svg");
+
+                // Initially hide all pages and layers for clean start
+                d3.selectAll(".page-container").style("display", "none").style("opacity", 0);
+                d3.selectAll('[class^="layer-"]').style("display", "none").style("opacity", 0);
+
+                // Set initial state
+                updateVisibility();
+
+                // Event listeners
+                d3.select("#next").on("click", nextStep);
+                d3.select("#prev").on("click", prevStep);
+
+                const pageInput = d3.select("#page-input");
+                const viewInput = d3.select("#view-input");
+
+                pageInput.on("change", function() {
+                    let val = parseInt(this.value) - 1;
+                    if (isNaN(val)) return;
+                    if (val < 0) val = 0;
+                    if (val >= presentationData.length) val = presentationData.length - 1;
+                    currentPage = val;
+                    currentView = 1;
+                    updateVisibility();
+                });
+
+                viewInput.on("change", function() {
+                    const pageData = presentationData[currentPage];
+                    const numViews = Object.keys(pageData.views).length;
+                    let val = parseInt(this.value);
+                    if (isNaN(val)) return;
+                    if (val < 1) val = 1;
+                    if (val > numViews) val = numViews;
+                    currentView = val;
+                    updateVisibility();
+                });
+
+                window.addEventListener("keydown", (e) => {
+                    if (document.activeElement.tagName === "INPUT") return;
+                    if (e.key === "ArrowRight" || e.key === " ") nextStep();
+                    if (e.key === "ArrowLeft") prevStep();
+                });
+
+            } catch (error) {
+                console.error("Error loading presentation:", error);
+            }
+        }
+
+        function getOriginalCenter(selection, containerNode) {
+            const node = selection.node();
+            if (!node) return {x: 0, y: 0};
+
+            // Temporarily reset transform to original to get correct position
+            const currentTransform = node.getAttribute("transform");
+            const originalTransform = node.getAttribute("data-original-transform");
+            node.setAttribute("transform", originalTransform || "");
+
+            const bbox = node.getBBox();
+            const center = {
+                x: bbox.x + bbox.width / 2,
+                y: bbox.y + bbox.height / 2
+            };
+
+            const matrix = node.getCTM();
+            const containerMatrix = containerNode.getScreenCTM();
+            const elementToContainer = containerMatrix.inverse().multiply(matrix);
+
+            const point = node.ownerSVGElement.createSVGPoint();
+            point.x = center.x;
+            point.y = center.y;
+            const finalPoint = point.matrixTransform(elementToContainer);
+
+            // Restore transform
+            if (currentTransform === null) {
+                node.removeAttribute("transform");
+            } else {
+                node.setAttribute("transform", currentTransform);
+            }
+
+            return {
+                x: finalPoint.x,
+                y: finalPoint.y
+            };
+        }
+
+        function handleCustomTransitions() {
+            const pageNode = d3.select(`.page-${currentPage}`);
+            const containerNode = pageNode.node();
+            if (!containerNode) return;
+
+            const pageTransitions = customTransitions.filter(t => t.page === currentPage);
+            const allSelectors = new Set(pageTransitions.map(t => t.selector));
+
+            allSelectors.forEach(selector => {
+                const selection = pageNode.selectAll(selector);
+                const activeTransition = pageTransitions.find(t => t.view === currentView && t.selector === selector);
+
+                if (activeTransition) {
+                    if (activeTransition.type === "align") {
+                        const refA = pageNode.select(activeTransition.refA);
+                        const refB = pageNode.select(activeTransition.refB);
+
+                        const posA = getOriginalCenter(refA, containerNode);
+                        const posB = getOriginalCenter(refB, containerNode);
+
+                        const dx = posB.x - posA.x;
+                        const dy = posB.y - posA.y;
+
+                        selection.transition().duration(500)
+                            .attr("transform", function() {
+                                const original = this.getAttribute("data-original-transform") || "";
+                                return `${original} translate(${dx}, ${dy})`;
+                            });
+                    }
+                } else {
+                    // Reset to original transform
+                    selection.each(function() {
+                        const el = d3.select(this);
+                        const originalTransform = this.getAttribute("data-original-transform");
+                        el.transition().duration(500).attr("transform", originalTransform || null);
+                    });
+                }
+            });
+        }
+
+        function updateVisibility() {
+            const pageData = presentationData[currentPage];
+            const visibleLayers = pageData.views[currentView.toString()] || [];
+
+            // Store original transforms if not already stored
+            d3.selectAll(".page-container [class]").each(function() {
+                if (!this.hasAttribute("data-original-transform")) {
+                    const t = this.getAttribute("transform");
+                    this.setAttribute("data-original-transform", t || "");
+                }
+            });
+
+            // Update all pages visibility
+            d3.selectAll(".page-container").each(function() {
+                const node = d3.select(this);
+                const isCurrentPage = node.classed(`page-${currentPage}`);
+
+                if (isCurrentPage) {
+                    node.style("display", "inline")
+                        .transition().duration(500)
+                        .style("opacity", 1);
+                } else {
+                    node.transition().duration(500)
+                        .style("opacity", 0)
+                        .end().then(() => {
+                            if (!node.classed(`page-${currentPage}`)) {
+                                node.style("display", "none");
+                            }
+                        }).catch(() => {}); // ignore interrupted transitions
+                }
+            });
+
+            // Update layers in current page
+            const pageNode = d3.select(`.page-${currentPage}`);
+            pageData.layers.forEach(layerName => {
+                const isVisible = visibleLayers.includes(layerName);
+                const layerSelection = pageNode.selectAll(`[class~="layer-${layerName}"]`);
+
+                if (isVisible) {
+                    layerSelection.style("display", "inline")
+                        .transition().duration(500)
+                        .style("opacity", 1);
+                } else {
+                    layerSelection.transition().duration(500)
+                        .style("opacity", 0)
+                        .end().then(() => {
+                             // Check if it's still supposed to be hidden after transition
+                             const updatedPageData = presentationData[currentPage];
+                             const updatedVisibleLayers = updatedPageData.views[currentView.toString()] || [];
+                             if (!updatedVisibleLayers.includes(layerName)) {
+                                 layerSelection.style("display", "none");
+                             }
+                        }).catch(() => {});
+                }
+            });
+
+            handleCustomTransitions();
+
+            // Update UI
+            const numViews = Object.keys(pageData.views).length;
+            d3.select("#page-input").property("value", currentPage + 1).attr("max", presentationData.length);
+            d3.select("#page-total").text(presentationData.length);
+            d3.select("#view-input").property("value", currentView).attr("max", numViews);
+            d3.select("#view-total").text(numViews);
+        }
+
+        function nextStep() {
+            const pageData = presentationData[currentPage];
+            const numViews = Object.keys(pageData.views).length;
+
+            if (currentView < numViews) {
+                currentView++;
+            } else if (currentPage < presentationData.length - 1) {
+                currentPage++;
+                currentView = 1;
+            }
+            updateVisibility();
+        }
+
+        function prevStep() {
+            if (currentView > 1) {
+                currentView--;
+            } else if (currentPage > 0) {
+                currentPage--;
+                const prevPageData = presentationData[currentPage];
+                currentView = Object.keys(prevPageData.views).length;
+            }
+            updateVisibility();
+        }
+
+        init();
+    </script>
+</body>
+</html>
