@@ -73,13 +73,16 @@ def main():
 
         if page_num != current_page_num:
             current_page_num = page_num
-            current_page_el = ET.Element('{http://www.w3.org/2000/svg}page')
+            current_page_el = ET.Element('{http://www.w3.org/2000/svg}g')
+            current_page_el.set('class', f'page-container page-{page_num}')
             new_pages.append(current_page_el)
 
         current_page_el.append(obj)
 
     # Replace old page_set content with new_pages
-    # We clear page_set and add new_pages
+    # We change page_set to a group as well
+    page_set.tag = '{http://www.w3.org/2000/svg}g'
+    page_set.set('class', 'presentation-pageset')
     page_set.clear()
     page_set.text = "\n"
     for p in new_pages:
