@@ -1,0 +1,3 @@
+[submodule "ipe"]
+	path = ipe
+	url = https://github.com/otfried/ipe.git
