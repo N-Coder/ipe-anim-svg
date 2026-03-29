@@ -20,7 +20,7 @@ static cairo_status_t stream_writer(void *closure, const unsigned char *data,
 }
 
 void render(ostream &out, Document *iDoc, std::unique_ptr<Fonts> iFonts,
-            double tolerance = 0.1, double zoom = 1.0) {
+            double tolerance = 0.1, double zoom = 1.0, int singlePage = -1) {
   const Layout *iLayout = iDoc->cascade()->findLayout();
   Vector offset = iLayout->paper().topLeft();
   int wid = static_cast<int>(iLayout->paper().width() * zoom);
@@ -44,7 +44,10 @@ void render(ostream &out, Document *iDoc, std::unique_ptr<Fonts> iFonts,
     cairo_show_page(cc);
   };
 
-  for (int i = 0; i < iDoc->countPages(); ++i) {
+  int startPage = (singlePage > 0) ? (singlePage - 1) : 0;
+  int endPage   = (singlePage > 0) ? singlePage : iDoc->countPages();
+
+  for (int i = startPage; i < endPage; ++i) {
     Page *page = iDoc->page(i);
 
     // const auto viewMap = page->viewMap(view, iDoc->cascade());
@@ -135,21 +138,36 @@ void render(ostream &out, Document *iDoc, std::unique_ptr<Fonts> iFonts,
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    std::cerr << "Usage: " << argv[0] << " <input.ipe> <output.svg>"
+  // Usage: ipe_svg <input.ipe> <output.svg> [--page N]
+  if (argc != 3 && argc != 5) {
+    std::cerr << "Usage: " << argv[0] << " <input.ipe> <output.svg> [--page N]"
               << std::endl;
     return 1;
   }
 
-  const char *inputFile = argv[1];
+  const char *inputFile  = argv[1];
   const char *outputFile = argv[2];
+
+  int singlePage = -1;
+  if (argc == 5) {
+    if (string(argv[3]) != "--page") {
+      std::cerr << "Error: unknown option '" << argv[3]
+                << "'. Expected --page N." << std::endl;
+      return 1;
+    }
+    singlePage = atoi(argv[4]);
+    if (singlePage < 1) {
+      std::cerr << "Error: --page N requires N >= 1." << std::endl;
+      return 1;
+    }
+  }
 
   Platform::initLib(IPELIB_VERSION);
   Platform::setDebug(true);
 
   Document *doc = Document::loadWithErrorReport(inputFile);
   if (!doc) {
-    std::cerr << "Error: Could not reaf input file: " << inputFile << std::endl;
+    std::cerr << "Error: Could not read input file: " << inputFile << std::endl;
     return 1;
   }
   doc->runLatex(inputFile);
@@ -160,7 +178,7 @@ int main(int argc, char **argv) {
     delete doc;
     return 1;
   }
-  render(out, doc, std::make_unique<Fonts>(doc->resources()));
+  render(out, doc, std::make_unique<Fonts>(doc->resources()), 0.1, 1.0, singlePage);
 
   delete doc;
   return 0;

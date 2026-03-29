@@ -1,0 +1,186 @@
+{
+  "pages": [
+    {
+      "index": 1,
+      "title": "",
+      "file": "page-01.svg",
+      "layers": "title BACKGROUND",
+      "views": [
+        "title"
+      ]
+    },
+    {
+      "index": 2,
+      "title": "Tractable Fragments of \\underline{Partial Level Planarity}",
+      "file": "page-02.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta theta iota kappa",
+      "views": [
+        "kappa",
+        "alpha kappa",
+        "alpha beta kappa",
+        "alpha beta gamma kappa",
+        "alpha beta gamma delta kappa",
+        "alpha beta gamma delta epsilon kappa",
+        "alpha beta gamma delta epsilon zeta kappa",
+        "alpha beta gamma delta epsilon zeta eta kappa",
+        "alpha beta gamma delta epsilon zeta eta theta kappa",
+        "alpha beta gamma delta epsilon zeta eta theta iota kappa"
+      ]
+    },
+    {
+      "index": 3,
+      "title": "Two Problems",
+      "file": "page-03.svg",
+      "layers": "alpha graph edgeA edgeB edgeC beta gamma delta epsilon zeta eta theta iota kappa lambda mu",
+      "views": [
+        "alpha",
+        "alpha graph edgeA edgeB edgeC",
+        "alpha graph edgeA edgeC beta",
+        "alpha graph edgeA edgeB edgeC",
+        "alpha graph edgeB edgeC gamma",
+        "alpha graph edgeB edgeC delta",
+        "alpha graph edgeB edgeC delta iota",
+        "alpha graph edgeB edgeC delta iota kappa lambda",
+        "alpha graph edgeB edgeC delta epsilon iota kappa lambda mu",
+        "alpha graph edgeB edgeC delta epsilon zeta iota kappa",
+        "alpha graph edgeB edgeC delta epsilon zeta eta iota kappa",
+        "alpha graph edgeB edgeC delta epsilon zeta eta theta iota kappa"
+      ]
+    },
+    {
+      "index": 4,
+      "title": "Extension Problems",
+      "file": "page-04.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta theta",
+      "views": [
+        "alpha",
+        "alpha beta",
+        "alpha beta gamma",
+        "alpha beta gamma delta",
+        "alpha beta gamma delta epsilon",
+        "gamma delta epsilon zeta",
+        "gamma delta epsilon zeta eta"
+      ]
+    },
+    {
+      "index": 5,
+      "title": "Proper Level Planarity via SAT",
+      "file": "page-05.svg",
+      "layers": "alpha beta delta gamma epsilon zeta eta theta iota kappa",
+      "views": [
+        "alpha",
+        "alpha gamma",
+        "alpha gamma epsilon",
+        "alpha gamma epsilon zeta",
+        "alpha gamma epsilon zeta eta",
+        "alpha gamma epsilon zeta eta theta",
+        "alpha delta gamma epsilon zeta eta theta iota",
+        "alpha beta delta gamma epsilon zeta eta theta iota",
+        "alpha beta delta gamma epsilon zeta eta theta iota kappa"
+      ]
+    },
+    {
+      "index": 6,
+      "title": "Proper PLP is FPT by \\# missing vertices $n_\\text{add}$",
+      "file": "page-06.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta",
+      "views": [
+        "alpha zeta",
+        "alpha gamma zeta",
+        "alpha gamma zeta eta",
+        "alpha beta gamma eta",
+        "alpha beta gamma delta eta",
+        "alpha beta gamma delta epsilon eta"
+      ]
+    },
+    {
+      "index": 7,
+      "title": "Proper Partial Level Planarity via SAT",
+      "file": "page-07.svg",
+      "layers": "alpha beta delta gamma epsilon zeta eta theta iota kappa delta' epsilon' zeta' eta' theta' lambda mu nu",
+      "views": [
+        "alpha beta gamma epsilon zeta eta theta iota",
+        "alpha beta gamma epsilon zeta eta theta iota lambda",
+        "alpha beta gamma epsilon zeta eta theta iota lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota delta' lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota delta' epsilon' lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota delta' zeta' lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota eta' lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota eta' theta' lambda mu",
+        "alpha beta gamma epsilon zeta eta theta iota eta' theta' lambda mu nu"
+      ]
+    },
+    {
+      "index": 8,
+      "title": "Overview",
+      "file": "page-08.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta iota kappa lambda mu nu",
+      "views": [
+        "alpha eta",
+        "alpha gamma eta",
+        "alpha gamma zeta eta",
+        "alpha gamma zeta eta lambda",
+        "alpha gamma zeta eta iota lambda",
+        "alpha gamma zeta eta iota kappa lambda",
+        "alpha gamma zeta eta iota kappa lambda mu",
+        "alpha gamma zeta eta iota kappa lambda mu nu"
+      ]
+    },
+    {
+      "index": 9,
+      "title": "Biconnected PLP is FPT by VEDD",
+      "file": "page-09.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta theta iota kappa",
+      "views": [
+        "alpha",
+        "alpha beta",
+        "alpha beta gamma",
+        "alpha beta gamma delta",
+        "alpha beta gamma delta epsilon",
+        "alpha beta gamma delta epsilon zeta",
+        "alpha beta gamma delta epsilon zeta eta",
+        "alpha beta gamma delta epsilon zeta eta theta",
+        "alpha beta gamma delta epsilon zeta eta theta iota",
+        "alpha beta gamma delta epsilon zeta eta theta iota kappa"
+      ]
+    },
+    {
+      "index": 10,
+      "title": "Tractable Fragments of Partial Level Planarity",
+      "file": "page-10.svg",
+      "layers": "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu",
+      "views": [
+        "alpha beta gamma delta epsilon zeta eta theta mu",
+        "alpha beta gamma delta epsilon zeta eta theta kappa mu",
+        "alpha beta gamma delta epsilon zeta eta theta kappa lambda"
+      ]
+    },
+    {
+      "index": 11,
+      "title": "",
+      "file": "page-11.svg",
+      "layers": "alpha",
+      "views": [
+        "alpha"
+      ]
+    },
+    {
+      "index": 12,
+      "title": "Partial Level Planarity Parameterized by $\\mid$Missing Graph$\\mid$",
+      "file": "page-12.svg",
+      "layers": "alpha BACKGROUND",
+      "views": [
+        "alpha BACKGROUND"
+      ]
+    },
+    {
+      "index": 13,
+      "title": "Partial Level Planarity Parameterized by $\\mid$Missing Graph$\\mid$",
+      "file": "page-13.svg",
+      "layers": "alpha BACKGROUND",
+      "views": [
+        "alpha BACKGROUND"
+      ]
+    }
+  ]
+}
