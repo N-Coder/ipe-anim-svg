@@ -1,19 +1,22 @@
 # ipe-svg
 
-Convert [Ipe](https://ipe.otfried.org/) presentations to self-contained,
+Convert [Ipe](https://ipe.otfried.org/) presentations to interactive and animated,
 statically-hostable [reveal.js](https://revealjs.com/) websites.
 
-Each Ipe page becomes a reveal.js slide. Views within a page (the incremental
-build-up of layers) become fragment steps. The resulting site requires no
-server — just a browser.
+Each Ipe page becomes a reveal.js slide. Views within a page (the incremental build-up of layers) become fragment steps.
+The resulting site requires no specialized software — just a browser.
+See the `example/` folder for a demo that is also available live on GitHub Pages [here](https://n-coder.github.io/ipe-anim-svg/example/presentation.html.
 
 ---
 
 ## Quick start
 
+Dependencies: a C++ compiler and CMake, Cairo and FreeType development libraries (and the Ipe git submodule).
+
 ```bash
 # 1. Build the C++ renderer
-cmake -B build -G Ninja
+git submodule update --init
+cmake -B build
 cmake --build build
 
 # 2. Convert your presentation
@@ -57,7 +60,6 @@ Alternatively, push `output/` to a dedicated `gh-pages` branch:
 ```bash
 git subtree push --prefix output origin gh-pages
 ```
-The site is then at `https://<user>.github.io/<repo>/`.
 
 ---
 
@@ -272,15 +274,3 @@ python3 ipe_info.py <input.ipe> > info.json
 
 This step is performed automatically by `ipe2reveal.py`. Use it directly only
 if you need the raw metadata for a custom workflow.
-
----
-
-## Building `ipe_svg`
-
-Dependencies: Cairo, Ipe library, FreeType (and the Ipe git submodule).
-
-```bash
-git submodule update --init
-cmake -B build -G Ninja
-cmake --build build
-```
