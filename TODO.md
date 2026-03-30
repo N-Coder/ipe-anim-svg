@@ -1,7 +1,5 @@
+# Animations
 - add simple [animate.css](https://animate.style/) animations
 - add more involved [SVG.js](https://svgjs.dev/docs/3.2/) animations
 - implement easily accessible animation primitives fron Annas thesis
 - generate animated example
-- add flags to generate self-contained (file:// hostable) HTML file
-- use separate ipe-meta.json when hosted and only inline it for stand-alone usage
-- do not overwrite the html file if it already exists, but report differences

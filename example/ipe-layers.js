@@ -24,10 +24,14 @@ const IpeLayers = (() => {
   // Metadata
   // -------------------------------------------------------------------------
 
-  function parseMeta() {
+  async function parseMeta() {
     const el = document.getElementById('ipe-meta');
-    if (!el) throw new Error('IpeLayers: #ipe-meta element not found.');
-    return JSON.parse(el.textContent);
+    if (el) return JSON.parse(el.textContent);
+    // Fall back to fetching the separate metadata file (multi-file / hosted mode).
+    const res = await fetch('ipe-meta.json');
+    if (!res.ok)
+      throw new Error(`IpeLayers: failed to fetch ipe-meta.json: HTTP ${res.status}`);
+    return res.json();
   }
 
   // -------------------------------------------------------------------------
@@ -233,7 +237,7 @@ const IpeLayers = (() => {
     async init(deck) {
       let meta;
       try {
-        meta = parseMeta();
+        meta = await parseMeta();
       } catch (e) {
         console.error(e);
         return;
