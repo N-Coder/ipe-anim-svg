@@ -60,7 +60,11 @@ def parse_ipe(ipe_file: str) -> tuple[str, list[dict]]:
             # No explicit views → one implicit view showing all layers
             views = [list(layers)]
 
-        pages.append({'title': title, 'layers': layers, 'views': views})
+        note_el = page_el.find('notes')
+        notes = (note_el.text or '').strip() if note_el is not None else ''
+
+        pages.append({'title': title, 'layers': layers, 'views': views,
+                      'notes': notes})
 
     return pres_title, pages
 
@@ -89,6 +93,7 @@ def render_page(ipe_svg_bin: str, ipe_file: str, out_svg: str,
     return [
         l for l in (line.strip() for line in result.stdout.splitlines()) if l
     ]
+
 
 # ---------------------------------------------------------------------------
 # 3. Apply class tags (adapted from apply_classes.py)
@@ -128,9 +133,12 @@ def apply_classes(svg_content: str, tag_lines: list[str]) -> str:
             processed.append(child)
         # empty: skip
 
-    # Replace pageSet with a flat <g class="ipe-page"> containing all objects
-    page_set.tag = '{http://www.w3.org/2000/svg}g'
-    page_set.set('class', 'ipe-page')
+    if page_set is not None:
+        # Replace pageSet with a flat <g class="ipe-page"> containing all objects
+        page_set.tag = '{http://www.w3.org/2000/svg}g'
+        page_set.set('class', 'ipe-page')
+    else:
+        page_set = root
     page_set.clear()
     for obj in processed:
         page_set.append(obj)
@@ -191,7 +199,7 @@ def build_meta(pages: list[dict], filenames: list[str]) -> dict:
 # 6. Generate HTML skeleton
 # ---------------------------------------------------------------------------
 
-REVEAL_CDN = 'https://cdn.jsdelivr.net/npm/reveal.js@5'
+REVEAL_CDN = 'https://cdn.jsdelivr.net/npm/reveal.js@6'
 
 
 def _esc(s: str) -> str:
@@ -206,7 +214,14 @@ def generate_html(pres_title: str, pages: list[dict], meta: dict) -> str:
     section_lines = []
     for i, page in enumerate(pages, start=1):
         comment = f'  <!-- {_esc(page["title"])} -->' if page['title'] else ''
-        section_lines.append(f'    <section data-ipe-page="{i}"></section>{comment}')
+        if page['notes']:
+            notes_html = _esc(page['notes'])
+            inner = f'      <aside class="notes">{notes_html}</aside>\n    '
+            section_lines.append(
+                f'    <section data-ipe-page="{i}">{comment}\n{inner}</section>')
+        else:
+            section_lines.append(
+                f'    <section data-ipe-page="{i}"></section>{comment}')
     sections_html = '\n'.join(section_lines)
 
     meta_json = json.dumps(meta, indent=4, ensure_ascii=False)
@@ -245,12 +260,13 @@ def generate_html(pres_title: str, pages: list[dict], meta: dict) -> str:
 </script>
 
 <script src="{REVEAL_CDN}/dist/reveal.js"></script>
+<script src="{REVEAL_CDN}/dist/plugin/notes.js"></script>
 <script src="ipe-layers.js"></script>
 <script>
 Reveal.initialize({{
   hash: true,
   transition: 'fade',
-  plugins: [IpeLayers],
+  plugins: [RevealNotes, IpeLayers],
 }});
 </script>
 

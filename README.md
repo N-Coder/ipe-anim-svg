@@ -5,7 +5,7 @@ statically-hostable [reveal.js](https://revealjs.com/) websites.
 
 Each Ipe page becomes a reveal.js slide. Views within a page (the incremental build-up of layers) become fragment steps.
 The resulting site requires no specialized software — just a browser.
-See the `example/` folder for a demo that is also available live on GitHub Pages [here](https://n-coder.github.io/ipe-anim-svg/example/presentation.html.
+See the `example/` folder for a demo that is also available live on GitHub Pages [here](https://n-coder.github.io/ipe-anim-svg/example/presentation.html).
 
 ---
 
@@ -123,12 +123,20 @@ appears in the Ipe document:
 <section data-ipe-page="Method"></section>
 ```
 
-Omit the attribute entirely to use the next not-yet-displayed page in document
-order:
+Omit the attribute entirely and the plugin will assign the next page that has
+not yet been claimed by any other section. Pages are considered claimed as soon
+as any section — explicit or auto — is resolved to them. Resolution happens in
+document order, so sections earlier in the list claim their pages first:
 
 ```html
-<section></section>  <!-- first unassigned page -->
-<section></section>  <!-- second unassigned page -->
+<!-- Three auto-sections: get pages 1, 2, 3 in order -->
+<section></section>
+<section></section>
+<section></section>
+
+<!-- Mixed: explicit page 3 is claimed first, so the auto-section gets page 1 -->
+<section data-ipe-page="3"></section>
+<section></section>
 ```
 
 ### Reordering and skipping pages
@@ -139,7 +147,23 @@ pages, or show the same page more than once:
 ```html
 <section data-ipe-page="3"></section>  <!-- show Results first -->
 <section data-ipe-page="1"></section>  <!-- then Introduction -->
-<!-- page 2 is omitted entirely -->
+                                       <!-- page 2 does not appear -->
+```
+
+Note: if there were a third `<section></section>` (no attribute) after these
+two, it would pick up page 2 as the next unclaimed page — skipping a page
+requires that it is not claimed by any section, explicit or auto.
+
+To prevent bare sections from auto-claiming pages at all, add `data-ipe-no-auto`
+to the root `<div class="slides">`. The plugin then ignores any section that
+lacks a `data-ipe-page` attribute:
+
+```html
+<div class="slides" data-ipe-no-auto>
+  <section data-ipe-page="3"></section>  <!-- processed: explicit page -->
+  <section data-ipe-page="1"></section>  <!-- processed: explicit page -->
+  <section></section>                    <!-- ignored: no data-ipe-page -->
+</div>
 ```
 
 ### Hand-authoring fragment steps
@@ -166,12 +190,20 @@ To suppress auto-filling entirely for a section, add `data-ipe-no-auto`:
 </section>
 ```
 
-Apply `data-ipe-no-auto` to `<div class="slides">` to disable auto-filling
-globally.
+Note: `data-ipe-no-auto` on `<div class="slides">` controls page assignment
+(bare sections are skipped), not fragment auto-fill. To suppress view-fragment
+auto-fill for all slides you must add `data-ipe-no-auto` to each `<section>`
+individually.
 
 ### Speaker notes
 
-Standard reveal.js `<aside class="notes">` works as usual:
+The reveal.js [Notes plugin](https://revealjs.com/speaker-view/) is included automatically. Notes written in Ipe (**Edit → Notes…** for the current page) are imported by `ipe2reveal.py` and placed in the generated `presentation.html` as `<aside class="notes">` elements automatically.
+
+Press **S** while viewing the presentation to open the speaker view in a separate window. It shows the current slide, the next slide, your notes, and a timer.
+
+> **Tip:** The speaker window must be opened from the same browser that is driving the presentation. Both windows communicate via `localStorage`, so they need to share the same origin.
+
+You can also add or edit notes directly in `presentation.html`:
 
 ```html
 <section data-ipe-page="2">
@@ -187,7 +219,7 @@ Edit the reveal.js initialisation block near the bottom of `presentation.html`:
 Reveal.initialize({
   hash: true,
   transition: 'slide',  // none | fade | slide | convex | concave | zoom
-  plugins: [IpeLayers],
+  plugins: [RevealNotes, IpeLayers],
 });
 ```
 

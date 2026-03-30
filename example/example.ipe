@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE ipe SYSTEM "ipe.dtd">
 <ipe version="70218" creator="Ipe 7.2.28">
-<info created="D:20090429144355" modified="D:20260327154348" title="Partial Level Planarity Parameterized by |Missing Graph|" author="Simon D. Fink" numberpages="yes"/>
+<info created="D:20090429144355" modified="D:20260330132436" title="Partial Level Planarity Parameterized by |Missing Graph|" author="Simon D. Fink" numberpages="yes"/>
 <preamble>\usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
 \usepackage{marvosym}
@@ -1168,6 +1168,8 @@ h
 <dashstyle name="W dot ultrafat" value="[0.01 4] 0"/>
 </ipestyle>
 <page>
+<notes>This is the title slide
+</notes>
 <layer name="title"/>
 <layer name="BACKGROUND"/>
 <view layers="title" active="title"/>
@@ -4706,6 +4708,13 @@ $\Rightarrow$\\
 <use matrix="3.54903 0 0 3.78798 -495.66 -2655.97" name="mark/disk(sx)" pos="272 776" size="normal" stroke="black"/>
 </page>
 <page title="Tractable Fragments of \underline{Partial Level Planarity}">
+<notes>some further
+multi-
+line
+
+notes
+are
+here</notes>
 <layer name="alpha"/>
 <layer name="beta"/>
 <layer name="gamma"/>
@@ -5740,6 +5749,7 @@ h
 </path>
 </page>
 <page title="Extension Problems">
+<notes>notes after a non-note page!</notes>
 <layer name="alpha"/>
 <layer name="beta"/>
 <layer name="gamma"/>
@@ -9785,6 +9795,7 @@ h
 </path>
 </page>
 <page>
+<notes>this page (but not the notes) intentionally left blank</notes>
 <layer name="alpha"/>
 <view layers="alpha" active="alpha"/>
 <path layer="alpha" fill="black">
