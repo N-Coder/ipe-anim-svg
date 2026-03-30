@@ -11,7 +11,10 @@ See the `example/` folder for a demo that is also available live on GitHub Pages
 
 ## Quick start
 
-Dependencies: a C++ compiler and CMake, Cairo and FreeType development libraries (and the Ipe git submodule).
+Dependencies:
+- a C++ compiler and CMake
+- development versions of the Cairo and FreeType libraries
+- an installed ipelib that matches version checked out in the Ipe git submodule
 
 ```bash
 # 1. Build the C++ renderer
@@ -77,11 +80,12 @@ git subtree push --prefix output origin gh-pages
 ### What the plugin does at load time
 
 1. Reads `#ipe-meta` (embedded JSON in `presentation.html`).
-2. Matches each `<section>` to an Ipe page (see *Editing the HTML* below).
-3. Fetches the matching `page-N.svg` and injects it into the section.
-4. Appends any missing `.fragment.ipe-view` spans for views that were not
+2. Matches each `<section data-ipe-page="…">` to an Ipe page (see *Editing the HTML* below).
+3. Appends a new `<section>` for every Ipe page not yet claimed by any existing section.
+4. Fetches the matching `page-N.svg` and injects it into each section.
+5. Appends any missing `.fragment.ipe-view` spans for views that were not
    hand-authored.
-5. Applies the initial layer visibility (view 1) to every slide.
+6. Applies the initial layer visibility (view 1) to every slide.
 
 During navigation it listens to reveal.js events:
 
@@ -115,31 +119,34 @@ the next run).
 
 ### Selecting pages
 
-`data-ipe-page` accepts a **1-based index** or a **page title** exactly as it
-appears in the Ipe document:
+`data-ipe-page` accepts a **1-based index**, a **page title** exactly as it
+appears in the Ipe document, or the special value **`auto`**:
 
 ```html
-<section data-ipe-page="2"></section>
-<section data-ipe-page="Method"></section>
+<section data-ipe-page="2"></section>       <!-- explicit index -->
+<section data-ipe-page="Method"></section>  <!-- explicit title -->
+<section data-ipe-page="auto"></section>    <!-- next unclaimed page -->
 ```
 
-Omit the attribute entirely and the plugin will assign the next page that has
-not yet been claimed by any other section. Pages are considered claimed as soon
-as any section — explicit or auto — is resolved to them. Resolution happens in
-document order, so sections earlier in the list claim their pages first:
+`data-ipe-page="auto"` assigns the next page that has not yet been claimed by
+any other section. Resolution happens in document order, so earlier sections
+claim their pages first:
 
 ```html
 <!-- Three auto-sections: get pages 1, 2, 3 in order -->
-<section></section>
-<section></section>
-<section></section>
+<section data-ipe-page="auto"></section>
+<section data-ipe-page="auto"></section>
+<section data-ipe-page="auto"></section>
 
 <!-- Mixed: explicit page 3 is claimed first, so the auto-section gets page 1 -->
 <section data-ipe-page="3"></section>
-<section></section>
+<section data-ipe-page="auto"></section>
 ```
 
-### Reordering and skipping pages
+A `<section>` with no `data-ipe-page` at all is treated as a plain reveal.js
+slide and is not touched by the plugin.
+
+### Reordering, skipping, and auto-appending pages
 
 Because sections are resolved at runtime you can freely reorder them, skip
 pages, or show the same page more than once:
@@ -147,22 +154,19 @@ pages, or show the same page more than once:
 ```html
 <section data-ipe-page="3"></section>  <!-- show Results first -->
 <section data-ipe-page="1"></section>  <!-- then Introduction -->
-                                       <!-- page 2 does not appear -->
+                                       <!-- page 2 not mentioned yet -->
 ```
 
-Note: if there were a third `<section></section>` (no attribute) after these
-two, it would pick up page 2 as the next unclaimed page — skipping a page
-requires that it is not claimed by any section, explicit or auto.
-
-To prevent bare sections from auto-claiming pages at all, add `data-ipe-no-auto`
-to the root `<div class="slides">`. The plugin then ignores any section that
-lacks a `data-ipe-page` attribute:
+By default the plugin appends a new `<section>` for every page that was not
+claimed by any section in the HTML, so page 2 would still appear at the end.
+To prevent this and show only the pages you explicitly list, add
+`data-ipe-no-auto-pages` to the root `<div class="slides">`:
 
 ```html
-<div class="slides" data-ipe-no-auto>
-  <section data-ipe-page="3"></section>  <!-- processed: explicit page -->
-  <section data-ipe-page="1"></section>  <!-- processed: explicit page -->
-  <section></section>                    <!-- ignored: no data-ipe-page -->
+<div class="slides" data-ipe-no-auto-pages>
+  <section data-ipe-page="3"></section>  <!-- Results -->
+  <section data-ipe-page="1"></section>  <!-- Introduction -->
+                                         <!-- page 2 is omitted entirely -->
 </div>
 ```
 
@@ -179,21 +183,36 @@ can write them yourself if you want to customise the visible layers:
 ```
 
 `data-visible-layers` is a **space-separated list** of layer names. The plugin
-appends any remaining auto-generated spans after your hand-authored ones.
+appends any remaining auto-generated views as spans after your hand-authored ones.
 
-To suppress auto-filling entirely for a section, add `data-ipe-no-auto`:
+To suppress auto-filling entirely for a section, add `data-ipe-no-auto-views`:
 
 ```html
-<section data-ipe-page="2" data-ipe-no-auto>
-  <!-- Exactly the spans you write here; nothing added automatically -->
+<section data-ipe-page="2" data-ipe-no-auto-views>
+  <!-- Exactly the views you write here; nothing added automatically -->
   <span class="fragment ipe-view" data-visible-layers="intro"></span>
 </section>
 ```
 
-Note: `data-ipe-no-auto` on `<div class="slides">` controls page assignment
-(bare sections are skipped), not fragment auto-fill. To suppress view-fragment
-auto-fill for all slides you must add `data-ipe-no-auto` to each `<section>`
-individually.
+To suppress view-fragment auto-fill for all slides globally, add
+`data-ipe-no-auto-views` to the root `<div class="slides">`:
+
+```html
+<div class="slides" data-ipe-no-auto-views>
+  <!-- No view-fragment spans will be auto-generated for any slide -->
+  <section data-ipe-page="1"></section>
+  <section data-ipe-page="2"></section>
+</div>
+```
+
+Both attributes may be combined if you want to suppress both auto-page
+assignment and auto-view generation:
+
+```html
+<div class="slides" data-ipe-no-auto-pages data-ipe-no-auto-views>
+  <section data-ipe-page="1"></section>
+</div>
+```
 
 ### Speaker notes
 

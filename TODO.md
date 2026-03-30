@@ -1,8 +1,7 @@
-- fix missing doc for auto-sections (and wrong example about dropped page 2) in README.md
-- add reveal.js plugins like presenter view (including notes)
 - add simple [animate.css](https://animate.style/) animations
 - add more involved [SVG.js](https://svgjs.dev/docs/3.2/) animations
 - implement easily accessible animation primitives fron Annas thesis
 - generate animated example
 - add flags to generate self-contained (file:// hostable) HTML file
 - use separate ipe-meta.json when hosted and only inline it for stand-alone usage
+- correctly handle pages where no page set is generated (eg page 11 that only contains one object)
