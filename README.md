@@ -304,19 +304,6 @@ is shown:
 </section>
 ```
 
-**SVG transform fix:** some animate.css effects use CSS `transform`.  Add this
-to `presentation.html`'s `<style>` block so transforms are relative to each
-element's own bounding box:
-
-```css
-.ipe-page [data-ipe-layer] {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-```
-
-Opacity-only animations (`fadeIn`, `fadeOut`, `flash`, …) work without this fix.
-
 ### Changing the theme and transition
 
 Edit the reveal.js initialisation block near the bottom of `presentation.html`:

@@ -273,20 +273,53 @@ const IpeLayers = (() => {
   }
 
   /**
+   * Return (creating if necessary) a plain wrapper <g> around el.
+   *
+   * Cairo renders every SVG primitive with an individual transform attribute
+   * (matrix(1,0,0,-1,x,y)) that both positions the element and corrects for
+   * Ipe's Y-up coordinate system.  The CSS `transform` property overrides SVG
+   * `transform` attributes, so applying animate.css classes directly to those
+   * elements strips away their Y-flip and translation, causing them to appear
+   * upside-down and misplaced during the animation.
+   *
+   * Instead we animate a wrapper <g> that has no transform attribute of its
+   * own.  The wrapper sits in the SVG's normal coordinate space, so CSS
+   * transforms on it behave as expected; the inner element keeps its own
+   * transform intact and renders correctly throughout.
+   */
+  function getOrCreateWrapper(el) {
+    if (el._ipeAnimWrapper) return el._ipeAnimWrapper;
+    const wrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    // Scale/rotate animations should pivot around the element's own centre,
+    // not the SVG viewport centre.
+    wrapper.style.transformBox   = 'fill-box';
+    wrapper.style.transformOrigin = 'center';
+    el.parentNode.insertBefore(wrapper, el);
+    wrapper.appendChild(el);
+    el._ipeAnimWrapper = wrapper;
+    return wrapper;
+  }
+
+  /**
    * Start an animate.css animation on a single element.
+   * Animates a wrapper <g> (see getOrCreateWrapper) to avoid the CSS
+   * `transform` property overriding the element's SVG `transform` attribute.
    * Removes the animation classes when the animation ends so that the element
    * returns to its static CSS state (important for opacity-driven layer
    * visibility).
    */
   function playAnimation(el, rule) {
+    const target = (el.namespaceURI === 'http://www.w3.org/2000/svg')
+      ? getOrCreateWrapper(el)
+      : el;
     const cls = `animate__${rule.anim}`;
-    el.classList.remove('animate__animated', cls);
-    void el.offsetWidth;                      // force reflow to restart animation
-    if (rule.dur)   el.style.setProperty('--animate-duration', rule.dur);
-    if (rule.delay) el.style.animationDelay = rule.delay;
-    el.classList.add('animate__animated', cls);
-    el.addEventListener('animationend', () =>
-      el.classList.remove('animate__animated', cls), { once: true });
+    target.classList.remove('animate__animated', cls);
+    void target.offsetWidth;                  // force reflow to restart animation
+    if (rule.dur)   target.style.setProperty('--animate-duration', rule.dur);
+    if (rule.delay) target.style.animationDelay = rule.delay;
+    target.classList.add('animate__animated', cls);
+    target.addEventListener('animationend', () =>
+      target.classList.remove('animate__animated', cls), { once: true });
   }
 
   /**
