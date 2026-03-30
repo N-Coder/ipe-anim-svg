@@ -112,36 +112,63 @@ def apply_classes(svg_content: str, tag_lines: list[str]) -> str:
 
     page_set = (root.find('.//svg:pageSet', ns)
                 or root.find('.//pageSet'))
-    if page_set is None:
-        page_els = list(root)
-    else:
-        page_els = list(page_set)
-    if len(page_els) != len(tag_lines):
-        print(f'  Warning: {len(page_els)} SVG objects vs '
-              f'{len(tag_lines)} tag lines.', file=sys.stderr)
-
-    processed = []
-    for page_el, tags in zip(page_els, tag_lines):
-        children = list(page_el)
-        if len(children) > 1:
-            page_el.tag = '{http://www.w3.org/2000/svg}g'
-            page_el.set('class', tags)
-            processed.append(page_el)
-        elif len(children) == 1:
-            child = children[0]
-            child.set('class', tags)
-            processed.append(child)
-        # empty: skip
 
     if page_set is not None:
+        # Multi-object case: Cairo produced <pageSet><page>…</page>…</pageSet>.
+        # Each <page> corresponds to one rendered Ipe object / flush_object call.
+        page_els = list(page_set)
+        if len(page_els) != len(tag_lines):
+            print(f'  Warning: {len(page_els)} SVG objects vs '
+                  f'{len(tag_lines)} tag lines.', file=sys.stderr)
+
+        processed = []
+        for page_el, tags in zip(page_els, tag_lines):
+            children = list(page_el)
+            if len(children) > 1:
+                page_el.tag = '{http://www.w3.org/2000/svg}g'
+                page_el.set('class', tags)
+                processed.append(page_el)
+            elif len(children) == 1:
+                child = children[0]
+                child.set('class', tags)
+                processed.append(child)
+            # empty: skip
+
         # Replace pageSet with a flat <g class="ipe-page"> containing all objects
         page_set.tag = '{http://www.w3.org/2000/svg}g'
         page_set.set('class', 'ipe-page')
+        page_set.clear()
+        for obj in processed:
+            page_set.append(obj)
     else:
-        page_set = root
-    page_set.clear()
-    for obj in processed:
-        page_set.append(obj)
+        # No <pageSet>: Cairo rendered 0 or 1 cairo_show_page calls, so content
+        # sits directly in the SVG root (no multi-page wrapper).  The non-defs
+        # children together represent a single rendered object (if any).
+        # IMPORTANT: use root.remove() — not root.clear() — to preserve root
+        # attributes (viewBox, width, height) set by the Cairo surface size.
+        defs_tags = {'{http://www.w3.org/2000/svg}defs', 'defs'}
+        content_children = [c for c in root if c.tag not in defs_tags]
+        defs_children    = [c for c in root if c.tag in defs_tags]
+
+        for child in list(root):
+            root.remove(child)
+
+        for d in defs_children:
+            root.append(d)
+
+        wrapper = ET.SubElement(root, '{http://www.w3.org/2000/svg}g')
+        wrapper.set('class', 'ipe-page')
+
+        if content_children and tag_lines:
+            if len(content_children) == 1:
+                content_children[0].set('class', tag_lines[0])
+                wrapper.append(content_children[0])
+            else:
+                g = ET.SubElement(wrapper, '{http://www.w3.org/2000/svg}g')
+                g.set('class', tag_lines[0])
+                for el in content_children:
+                    g.append(el)
+        # Empty page (no content_children or no tag_lines): wrapper stays empty.
 
     buf = io.BytesIO()
     ET.ElementTree(root).write(buf, encoding='utf-8', xml_declaration=True)

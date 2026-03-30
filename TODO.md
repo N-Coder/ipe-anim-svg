@@ -4,4 +4,4 @@
 - generate animated example
 - add flags to generate self-contained (file:// hostable) HTML file
 - use separate ipe-meta.json when hosted and only inline it for stand-alone usage
-- correctly handle pages where no page set is generated (eg page 11 that only contains one object)
+- do not overwrite the html file if it already exists, but report differences
