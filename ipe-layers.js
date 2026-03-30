@@ -3,8 +3,9 @@
  *
  * Reads page/layer/view metadata from #ipe-meta, resolves <section> elements
  * to Ipe pages (by index, by title, or sequentially), fetches and injects the
- * per-page SVG, auto-fills missing view-fragment <span>s, and drives layer
- * visibility as the presentation navigates.
+ * per-page SVG, auto-fills missing view-fragment <span>s, drives layer
+ * visibility as the presentation navigates, and fires animate.css animations
+ * on layer elements at configurable trigger points.
  *
  * Data attributes consumed:
  *   <div class="slides" data-ipe-no-auto-pages>  — suppress auto-appending sections for unclaimed pages
@@ -13,8 +14,37 @@
  *   <section data-ipe-page="Title">              — select page by title
  *   <section data-ipe-page="auto">               — assign the next not-yet-claimed page sequentially
  *   <section data-ipe-no-auto-views>             — disable view-fragment auto-fill for this slide
+ *   <section data-ipe-animate='[...]'>           — animate.css rules for this slide (see below)
  *   <span class="fragment ipe-view"
  *         data-visible-layers="a b c">           — hand-authored view fragment
+ *   <span class="fragment ipe-view"
+ *         data-ipe-animate='[...]'>              — animations fired when this fragment is shown
+ *
+ * Animation rule format (JSON array on data-ipe-animate):
+ *   [
+ *     {
+ *       "sel":   ".layer-alpha",   // CSS selector scoped to the slide's SVG (required)
+ *       "anim":  "fadeInLeft",     // animate.css name without the animate__ prefix (required)
+ *       "on":    "reveal",         // trigger: "reveal" | "slide" | "view-N" (default: "reveal")
+ *       "dur":   "0.5s",           // optional: overrides --animate-duration
+ *       "delay": "0.2s"            // optional: overrides animation-delay
+ *     }
+ *   ]
+ *
+ * Triggers on <section data-ipe-animate>:
+ *   "reveal"  — fires when an element transitions from hidden to visible, both
+ *               on slide entry (for layers in the initial view) and on each
+ *               fragmentshown that makes new layers visible.
+ *   "slide"   — fires for all matching elements whenever this slide becomes
+ *               the current slide (slidechanged event).
+ *   "view-N"  — fires at the N-th view (1-based; view-1 = initial state,
+ *               view-2 = first fragment, etc.).  May be combined with a
+ *               selector to restrict which elements animate.
+ *
+ * Trigger on <span data-ipe-animate>:
+ *   The "on" field is ignored; all rules fire when the fragment is shown.
+ *   This is equivalent to placing a "view-N" rule on the section, but
+ *   co-located with the fragment span for clarity.
  */
 
 const IpeLayers = (() => {
@@ -228,6 +258,77 @@ const IpeLayers = (() => {
   }
 
   // -------------------------------------------------------------------------
+  // Animations
+  // -------------------------------------------------------------------------
+
+  function parseAnimRules(jsonStr) {
+    if (!jsonStr) return [];
+    try {
+      const v = JSON.parse(jsonStr);
+      return Array.isArray(v) ? v : [v];
+    } catch (e) {
+      console.warn('IpeLayers: invalid data-ipe-animate JSON:', jsonStr, e);
+      return [];
+    }
+  }
+
+  /**
+   * Start an animate.css animation on a single element.
+   * Removes the animation classes when the animation ends so that the element
+   * returns to its static CSS state (important for opacity-driven layer
+   * visibility).
+   */
+  function playAnimation(el, rule) {
+    const cls = `animate__${rule.anim}`;
+    el.classList.remove('animate__animated', cls);
+    void el.offsetWidth;                      // force reflow to restart animation
+    if (rule.dur)   el.style.setProperty('--animate-duration', rule.dur);
+    if (rule.delay) el.style.animationDelay = rule.delay;
+    el.classList.add('animate__animated', cls);
+    el.addEventListener('animationend', () =>
+      el.classList.remove('animate__animated', cls), { once: true });
+  }
+
+  /**
+   * Fire section-level animation rules that match `trigger`.
+   * prevVisible / nextVisible are Sets of currently-visible layer names.
+   *
+   * For the "reveal" trigger, only elements in layers that just became visible
+   * (present in nextVisible but not prevVisible) are animated.
+   * For all other triggers, every element matching rule.sel is animated.
+   */
+  function fireRules(section, rules, trigger, prevVisible, nextVisible) {
+    for (const rule of rules) {
+      if (!rule.anim || !rule.sel) continue;
+      const on = rule.on ?? 'reveal';
+      if (on !== trigger) continue;
+      section.querySelectorAll(`svg ${rule.sel}`).forEach(el => {
+        if (trigger === 'reveal') {
+          const layer = el.getAttribute('data-ipe-layer');
+          if (layer) {
+            // Skip elements whose layer was already visible or is still hidden.
+            if (prevVisible.has(layer) || !nextVisible.has(layer)) return;
+          }
+        }
+        playAnimation(el, rule);
+      });
+    }
+  }
+
+  /**
+   * Fire all animation rules on a fragment span (data-ipe-animate on
+   * .fragment.ipe-view).  The "on" field is ignored — rules fire whenever
+   * the fragment is shown.
+   */
+  function fireFragmentRules(section, fragment) {
+    const rules = parseAnimRules(fragment.dataset.ipeAnimate);
+    for (const rule of rules) {
+      if (!rule.anim || !rule.sel) continue;
+      section.querySelectorAll(`svg ${rule.sel}`).forEach(el => playAnimation(el, rule));
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Plugin
   // -------------------------------------------------------------------------
 
@@ -273,6 +374,10 @@ const IpeLayers = (() => {
         }
       }
 
+      // Tracks the set of currently-visible layer names per section, used to
+      // compute the layer diff needed by the "reveal" animation trigger.
+      const layersState = new Map();   // section → Set<layerName>
+
       // Inject SVGs and prepare fragments (async, in parallel per section).
       // View-fragment auto-fill is suppressed globally by data-ipe-no-auto-views
       // on .slides, or per-section by data-ipe-no-auto-views on the <section>.
@@ -287,6 +392,8 @@ const IpeLayers = (() => {
 
           // Apply view 1 as the starting visibility state
           applyLayers(section, pageInfo, pageInfo.views[0]);
+          layersState.set(section,
+            new Set(pageInfo.views[0].trim().split(/\s+/).filter(Boolean)));
         })
       );
 
@@ -303,7 +410,18 @@ const IpeLayers = (() => {
         // When navigating backward, reveal.js has already marked all fragments
         // of the target slide as .visible before firing this event, so
         // currentLayers() returns the correct last-view state.
-        applyLayers(currentSlide, pageInfo, currentLayers(currentSlide, pageInfo));
+        const layersStr = currentLayers(currentSlide, pageInfo);
+        applyLayers(currentSlide, pageInfo, layersStr);
+
+        const nextVisible = new Set(layersStr.trim().split(/\s+/).filter(Boolean));
+        layersState.set(currentSlide, nextVisible);
+
+        const rules = parseAnimRules(currentSlide.dataset.ipeAnimate);
+        // "slide": fires for all matching elements on every slide entry.
+        // "reveal": fires for all layers in the initial view (prevVisible is
+        // empty because we are arriving from a different slide).
+        fireRules(currentSlide, rules, 'slide',  new Set(), nextVisible);
+        fireRules(currentSlide, rules, 'reveal', new Set(), nextVisible);
       });
 
       deck.on('fragmentshown', ({ fragment }) => {
@@ -311,7 +429,26 @@ const IpeLayers = (() => {
         const section  = fragment.closest('section');
         const pageInfo = sectionPageMap.get(section);
         if (!pageInfo) return;
-        applyLayers(section, pageInfo, fragment.dataset.visibleLayers ?? '');
+
+        const prevVisible  = layersState.get(section) ?? new Set();
+        const nextLayersStr = fragment.dataset.visibleLayers ?? '';
+        const nextVisible  = new Set(nextLayersStr.trim().split(/\s+/).filter(Boolean));
+
+        applyLayers(section, pageInfo, nextLayersStr);
+        layersState.set(section, nextVisible);
+
+        // Determine the view-N label for this fragment.
+        // view-1 is the initial state (no fragment); the first .ipe-view
+        // fragment is view-2, the second is view-3, etc.
+        const frags = [...section.querySelectorAll('.fragment.ipe-view')];
+        const viewN = `view-${frags.indexOf(fragment) + 2}`;
+
+        const sectionRules = parseAnimRules(section.dataset.ipeAnimate);
+        fireRules(section, sectionRules, 'reveal', prevVisible, nextVisible);
+        fireRules(section, sectionRules, viewN,    prevVisible, nextVisible);
+
+        // Fragment-level rules: fire regardless of "on" field.
+        fireFragmentRules(section, fragment);
       });
 
       deck.on('fragmenthidden', ({ fragment }) => {
@@ -319,7 +456,11 @@ const IpeLayers = (() => {
         const section  = fragment.closest('section');
         const pageInfo = sectionPageMap.get(section);
         if (!pageInfo) return;
-        applyLayers(section, pageInfo, currentLayers(section, pageInfo));
+
+        const layersStr = currentLayers(section, pageInfo);
+        applyLayers(section, pageInfo, layersStr);
+        layersState.set(section,
+          new Set(layersStr.trim().split(/\s+/).filter(Boolean)));
       });
     },
   };

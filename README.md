@@ -254,6 +254,69 @@ You can also add or edit notes directly in `presentation.html`:
 </section>
 ```
 
+### animate.css animations
+
+You can attach [animate.css](https://animate.style/) animations to individual
+SVG elements by adding `data-ipe-animate` to a `<section>` or to a
+`.fragment.ipe-view` span.  The value is a JSON array of animation rules:
+
+```html
+<!-- Load animate.css (add to <head> of presentation.html) -->
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+<!-- In the slides: -->
+<section data-ipe-page="3" data-ipe-animate='[
+  { "sel": ".layer-alpha",  "anim": "fadeInLeft" },
+  { "sel": ".objnr-5",      "anim": "bounceIn",     "on": "view-2" },
+  { "sel": ".layer-title",  "anim": "fadeIn",        "on": "slide",
+                                                      "dur": "0.3s", "delay": "0.1s" }
+]'></section>
+```
+
+| Field | Values | Default | Meaning |
+|---|---|---|---|
+| `sel` | any CSS selector | required | Scoped to the slide's `<svg>` element |
+| `anim` | animate.css name | required | Without the `animate__` prefix, e.g. `"fadeInLeft"` |
+| `on` | `"reveal"` · `"slide"` · `"view-N"` | `"reveal"` | When to fire the animation |
+| `dur` | CSS time string | — | Overrides `--animate-duration` |
+| `delay` | CSS time string | — | Overrides `animation-delay` |
+
+**Trigger values:**
+
+- **`"reveal"`** (default) — fires when matching elements transition from
+  hidden to visible.  On slide entry this covers all elements in the initial
+  view; on fragment steps it covers elements in newly-revealed layers.
+- **`"slide"`** — fires for all matching elements every time the slide becomes
+  current, regardless of layer visibility.
+- **`"view-N"`** — fires at the N-th view step (1-based; view-1 = initial
+  state, view-2 = first fragment step, etc.).
+
+You can also place `data-ipe-animate` directly on a hand-authored fragment
+span.  The `"on"` field is then ignored — all rules fire when that fragment
+is shown:
+
+```html
+<section data-ipe-page="4">
+  <span class="fragment ipe-view"
+        data-visible-layers="result"
+        data-ipe-animate='[{ "sel": ".layer-result", "anim": "zoomIn" }]'></span>
+</section>
+```
+
+**SVG transform fix:** some animate.css effects use CSS `transform`.  Add this
+to `presentation.html`'s `<style>` block so transforms are relative to each
+element's own bounding box:
+
+```css
+.ipe-page [data-ipe-layer] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+```
+
+Opacity-only animations (`fadeIn`, `fadeOut`, `flash`, …) work without this fix.
+
 ### Changing the theme and transition
 
 Edit the reveal.js initialisation block near the bottom of `presentation.html`:

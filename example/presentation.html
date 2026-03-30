@@ -6,9 +6,12 @@
   <title>Partial Level Planarity Parameterized by |Missing Graph|</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6/dist/reveal.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6/dist/theme/white.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <style>
     /* Fade transitions for Ipe layer elements */
     [data-ipe-layer] { transition: opacity 0.3s ease; }
+    /* Allow animate.css transforms to use each element's own bounding box */
+    .ipe-page [data-ipe-layer] { transform-box: fill-box; transform-origin: center; }
   </style>
 </head>
 <body>
@@ -16,11 +19,15 @@
 <div class="reveal">
   <div class="slides">
 
-    <section data-ipe-page="1">
+    <!-- "slide" trigger: title layer fades down every time you arrive at this slide -->
+    <section data-ipe-page="1"
+             data-ipe-animate='[{"sel": ".layer-title", "anim": "fadeInDown", "on": "slide", "dur": "0.6s"}]'>
 
       <aside class="notes">This is the title slide</aside>
     </section>
-    <section data-ipe-page="2">  <!-- Tractable Fragments of \underline{Partial Level Planarity} -->
+    <!-- "reveal" trigger (default): each bullet point slides in as its layer is revealed -->
+    <section data-ipe-page="2"
+             data-ipe-animate='[{"sel": "[data-ipe-layer]", "anim": "fadeInLeft", "dur": "0.4s"}]'>  <!-- Tractable Fragments of \underline{Partial Level Planarity} -->
 
       <aside class="notes">some further
 multi-
@@ -30,7 +37,13 @@ notes
 are
 here</aside>
     </section>
-    <section data-ipe-page="3"></section>  <!-- Two Problems -->
+    <!-- fragment-span annotation: graph edges zoom in when view-2 is reached;
+         remaining views are auto-filled by the plugin -->
+    <section data-ipe-page="3">
+      <span class="fragment ipe-view"
+            data-visible-layers="alpha graph edgeA edgeB edgeC"
+            data-ipe-animate='[{"sel": ":is(.layer-graph, .layer-edgeA, .layer-edgeB, .layer-edgeC)", "anim": "zoomIn", "dur": "0.5s"}]'></span>
+    </section>  <!-- Two Problems -->
     <section data-ipe-page="4">  <!-- Extension Problems -->
 
       <aside class="notes">notes after a non-note page!</aside>
@@ -39,7 +52,9 @@ here</aside>
     <section data-ipe-page="6"></section>  <!-- Proper PLP is FPT by \# missing vertices $n_\text{add}$ -->
     <section data-ipe-page="7"></section>  <!-- Proper Partial Level Planarity via SAT -->
     <section data-ipe-page="8"></section>  <!-- Overview -->
-    <section data-ipe-page="9"></section>  <!-- Biconnected PLP is FPT by VEDD -->
+    <!-- "view-N" trigger: layer zeta gets a bounce when it appears at view-6 -->
+    <section data-ipe-page="9"
+             data-ipe-animate='[{"sel": ".layer-zeta", "anim": "bounceIn", "on": "view-6"}]'></section>  <!-- Biconnected PLP is FPT by VEDD -->
     <section data-ipe-page="10"></section>  <!-- Tractable Fragments of Partial Level Planarity -->
     <section data-ipe-page="11">
 
