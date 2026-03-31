@@ -272,6 +272,15 @@ const IpeLayers = (() => {
     }
   }
 
+  function parseTimeMs(s) {
+    if (!s) return 0;
+    return s.endsWith('ms') ? parseFloat(s) : parseFloat(s) * 1000;
+  }
+
+  function msToTimeStr(ms) {
+    return Number.isInteger(ms / 1000) ? `${ms / 1000}s` : `${ms}ms`;
+  }
+
   /**
    * Return (creating if necessary) a plain wrapper <g> around el.
    *
@@ -292,7 +301,7 @@ const IpeLayers = (() => {
     const wrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     // Scale/rotate animations should pivot around the element's own centre,
     // not the SVG viewport centre.
-    wrapper.style.transformBox   = 'fill-box';
+    wrapper.style.transformBox    = 'fill-box';
     wrapper.style.transformOrigin = 'center';
     el.parentNode.insertBefore(wrapper, el);
     wrapper.appendChild(el);
@@ -301,25 +310,124 @@ const IpeLayers = (() => {
   }
 
   /**
-   * Start an animate.css animation on a single element.
-   * Animates a wrapper <g> (see getOrCreateWrapper) to avoid the CSS
-   * `transform` property overriding the element's SVG `transform` attribute.
-   * Removes the animation classes when the animation ends so that the element
-   * returns to its static CSS state (important for opacity-driven layer
-   * visibility).
+   * Play an animate.css animation on `target`, starting after `extraDelayMs`
+   * milliseconds beyond rule.delay.  Cleans up animation classes on end.
    */
-  function playAnimation(el, rule) {
-    const target = (el.namespaceURI === 'http://www.w3.org/2000/svg')
-      ? getOrCreateWrapper(el)
-      : el;
+  function playOnTarget(target, rule, extraDelayMs = 0) {
     const cls = `animate__${rule.anim}`;
     target.classList.remove('animate__animated', cls);
     void target.offsetWidth;                  // force reflow to restart animation
-    if (rule.dur)   target.style.setProperty('--animate-duration', rule.dur);
-    if (rule.delay) target.style.animationDelay = rule.delay;
+    if (rule.dur) target.style.setProperty('--animate-duration', rule.dur);
+    const totalMs = parseTimeMs(rule.delay) + extraDelayMs;
+    target.style.animationDelay = totalMs > 0 ? msToTimeStr(totalMs) : '';
     target.classList.add('animate__animated', cls);
     target.addEventListener('animationend', () =>
       target.classList.remove('animate__animated', cls), { once: true });
+  }
+
+  /**
+   * Animate all elements together as one group.
+   *
+   * A temporary <g> wrapper is placed in the DOM (at the position of the last
+   * individual wrapper, i.e. the highest z-level among the matched elements).
+   * All per-element wrappers are reparented into it for the duration of the
+   * animation so that CSS percentage offsets and transform-origin are computed
+   * relative to the combined bounding box of the whole group.  On animationend
+   * every wrapper is restored to its original parent/position and the temporary
+   * group is removed, leaving the DOM unchanged after animation.
+   *
+   * Z-order: SVG uses DOM order as implicit z-order.  Reparenting elements into
+   * the group changes their position in the tree, and the CSS `transform` that
+   * animate.css applies to the group creates a new stacking context, so the
+   * implicit z-order would be lost.  We therefore make it explicit up-front:
+   * every sibling in the shared parent receives a `z-index` matching its
+   * original 1-based DOM position, and the group itself gets the z-index of the
+   * last moved wrapper.  After restoration, all explicit z-indices are cleared
+   * so DOM order is authoritative again.
+   *
+   * Limitation: within a CSS stacking context (i.e. while the group has an
+   * active `transform`) elements inside the group cannot interleave with
+   * elements outside it.  The group as a whole renders at the z-level of its
+   * last element; elements inside that should originally have been below some
+   * outside element may appear above it during the animation.  This is an
+   * inherent constraint of CSS stacking contexts and cannot be fully avoided
+   * with z-index alone.
+   */
+  function playGrouped(els, rule) {
+    if (!els.length) return;
+
+    // Ensure per-element wrappers exist (Y-flip protection).
+    const wrappers = els.map(el => getOrCreateWrapper(el));
+
+    // Require a single shared parent; fall back to individual mode otherwise.
+    const parentSet = new Set(wrappers.map(w => w.parentNode));
+    if (parentSet.size > 1) { playIndividual(els, rule); return; }
+    const parent = [...parentSet][0];
+
+    // Snapshot the current children of the shared parent BEFORE any DOM
+    // changes.  This is the ground truth for the original z-order.
+    const siblings = [...parent.children];
+
+    // Record each wrapper's next sibling so we can restore it later.
+    const positions = wrappers.map(w => w.nextSibling);
+
+    // Make implicit z-order explicit on every sibling (1-based so that a
+    // missing entry falls below everything).
+    siblings.forEach((child, i) => { child.style.zIndex = i + 1; });
+
+    // The group renders at the z-level of the last (topmost) wrapper.
+    const groupZ = siblings.indexOf(wrappers[wrappers.length - 1]) + 1;
+
+    // Create the temporary animation group and insert it where the last
+    // wrapper was, then move all wrappers into it.
+    const ns  = 'http://www.w3.org/2000/svg';
+    const grp = document.createElementNS(ns, 'g');
+    grp.style.transformBox    = 'fill-box';
+    grp.style.transformOrigin = 'center';
+    grp.style.zIndex          = groupZ;
+    parent.insertBefore(grp, positions[positions.length - 1]);
+    wrappers.forEach(w => grp.appendChild(w));
+
+    // Animate the group.
+    const cls = `animate__${rule.anim}`;
+    grp.classList.remove('animate__animated', cls);
+    void grp.offsetWidth;
+    if (rule.dur)   grp.style.setProperty('--animate-duration', rule.dur);
+    if (rule.delay) grp.style.animationDelay = rule.delay;
+    grp.classList.add('animate__animated', cls);
+
+    grp.addEventListener('animationend', () => {
+      // Restore each wrapper to its original position.  Iterate in reverse so
+      // that when a wrapper's recorded `next` is another wrapper in the same
+      // set, it is already back in the DOM by the time it is needed.
+      for (let i = wrappers.length - 1; i >= 0; i--) {
+        parent.insertBefore(wrappers[i], positions[i]);
+      }
+      grp.remove();
+      // DOM order is authoritative again — drop the explicit z-indices.
+      siblings.forEach(child => { child.style.zIndex = ''; });
+    }, { once: true });
+  }
+
+  /**
+   * Animate elements individually (default), optionally staggered.
+   * rule.stagger: CSS time string added cumulatively to each element's delay.
+   */
+  function playIndividual(els, rule) {
+    const staggerMs = parseTimeMs(rule.stagger);
+    els.forEach((el, i) => {
+      const target = (el.namespaceURI === 'http://www.w3.org/2000/svg')
+        ? getOrCreateWrapper(el)
+        : el;
+      playOnTarget(target, rule, i * staggerMs);
+    });
+  }
+
+  /** Dispatch to grouped or individual animation based on rule.mode. */
+  function playAnimationForElements(els, rule) {
+    if (!els.length) return;
+    if (rule.mode === 'group') playGrouped(els, rule);
+    else                       playIndividual(els, rule);
   }
 
   /**
@@ -335,29 +443,33 @@ const IpeLayers = (() => {
       if (!rule.anim || !rule.sel) continue;
       const on = rule.on ?? 'reveal';
       if (on !== trigger) continue;
-      section.querySelectorAll(`svg ${rule.sel}`).forEach(el => {
-        if (trigger === 'reveal') {
+
+      let els = [...section.querySelectorAll(`svg ${rule.sel}`)];
+
+      if (trigger === 'reveal') {
+        els = els.filter(el => {
           const layer = el.getAttribute('data-ipe-layer');
-          if (layer) {
-            // Skip elements whose layer was already visible or is still hidden.
-            if (prevVisible.has(layer) || !nextVisible.has(layer)) return;
-          }
-        }
-        playAnimation(el, rule);
-      });
+          if (!layer) return true;
+          // Only animate elements whose layer just became visible.
+          return !prevVisible.has(layer) && nextVisible.has(layer);
+        });
+      }
+
+      playAnimationForElements(els, rule);
     }
   }
 
   /**
    * Fire all animation rules on a fragment span (data-ipe-animate on
    * .fragment.ipe-view).  The "on" field is ignored — rules fire whenever
-   * the fragment is shown.
+   * the fragment is shown.  Supports mode and stagger like section-level rules.
    */
   function fireFragmentRules(section, fragment) {
     const rules = parseAnimRules(fragment.dataset.ipeAnimate);
     for (const rule of rules) {
       if (!rule.anim || !rule.sel) continue;
-      section.querySelectorAll(`svg ${rule.sel}`).forEach(el => playAnimation(el, rule));
+      const els = [...section.querySelectorAll(`svg ${rule.sel}`)];
+      playAnimationForElements(els, rule);
     }
   }
 
@@ -451,10 +563,20 @@ const IpeLayers = (() => {
 
         const rules = parseAnimRules(currentSlide.dataset.ipeAnimate);
         // "slide": fires for all matching elements on every slide entry.
-        // "reveal": fires for all layers in the initial view (prevVisible is
-        // empty because we are arriving from a different slide).
-        fireRules(currentSlide, rules, 'slide',  new Set(), nextVisible);
-        fireRules(currentSlide, rules, 'reveal', new Set(), nextVisible);
+        fireRules(currentSlide, rules, 'slide', new Set(), nextVisible);
+        // "reveal": fires only when the slide is entered at its initial state,
+        // i.e. no fragments are active yet.  When navigating backward (or
+        // jumping to a later fragment step), reveal.js pre-marks fragments as
+        // .visible before this event, so the check below is false and we skip
+        // the animation — elements must appear instantly at their final state.
+        // Without this guard, staggered animations would leave elements stuck
+        // at the `from` keyframe (opacity:0 / translated) for their delay
+        // period, making them invisible or partially animated on arrival.
+        const atInitialStep =
+          currentSlide.querySelector('.fragment.ipe-view.visible') === null;
+        if (atInitialStep) {
+          fireRules(currentSlide, rules, 'reveal', new Set(), nextVisible);
+        }
       });
 
       deck.on('fragmentshown', ({ fragment }) => {

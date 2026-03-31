@@ -23,9 +23,9 @@
 
       <aside class="notes">This is the title slide</aside>
     </section>
-    <!-- "reveal" trigger (default): each bullet point slides in as its layer is revealed -->
+    <!-- "reveal" + stagger: bullet points slide in one by one (0.08s apart) as each layer is revealed -->
     <section data-ipe-page="2"
-             data-ipe-animate='[{"sel": "[data-ipe-layer]", "anim": "fadeInLeft", "dur": "0.4s"}]'>  <!-- Tractable Fragments of \underline{Partial Level Planarity} -->
+             data-ipe-animate='[{"sel": "[data-ipe-layer]", "anim": "fadeInLeft", "dur": "0.4s", "stagger": "0.08s"}]'>  <!-- Tractable Fragments of \underline{Partial Level Planarity} -->
 
       <aside class="notes">some further
 multi-
@@ -35,14 +35,20 @@ notes
 are
 here</aside>
     </section>
-    <!-- fragment-span annotation: graph edges zoom in when view-2 is reached;
+    <!-- fragment-span annotation: graph + edges zoom in as a group (group mode:
+         the zoom pivots from their combined centre, not each element's own centre);
          remaining views are auto-filled by the plugin -->
     <section data-ipe-page="3">
       <span class="fragment ipe-view"
             data-visible-layers="alpha graph edgeA edgeB edgeC"
-            data-ipe-animate='[{"sel": ":is(.layer-graph, .layer-edgeA, .layer-edgeB, .layer-edgeC)", "anim": "zoomIn", "dur": "0.5s"}]'></span>
+            data-ipe-animate='[{"sel": ":is(.layer-graph, .layer-edgeA, .layer-edgeB, .layer-edgeC)", "anim": "zoomIn", "dur": "0.5s", "mode": "group"}]'></span>
     </section>  <!-- Two Problems -->
-    <section data-ipe-page="4">  <!-- Extension Problems -->
+    <!-- "view-N" attention seeker: .layer-alpha has been visible since view-1;
+         at view-4 (when delta is newly revealed) it gets a headShake to draw
+         attention back to it — the view-N trigger fires unconditionally, so it
+         works on already-visible elements, not just newly-revealed ones -->
+    <section data-ipe-page="4"
+             data-ipe-animate='[{"sel": ".layer-alpha", "anim": "headShake", "on": "view-4"}]'>  <!-- Extension Problems -->
 
       <aside class="notes">notes after a non-note page!</aside>
     </section>

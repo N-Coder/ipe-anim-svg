@@ -279,6 +279,8 @@ SVG elements by adding `data-ipe-animate` to a `<section>` or to a
 | `sel` | any CSS selector | required | Scoped to the slide's `<svg>` element |
 | `anim` | animate.css name | required | Without the `animate__` prefix, e.g. `"fadeInLeft"` |
 | `on` | `"reveal"` · `"slide"` · `"view-N"` | `"reveal"` | When to fire the animation |
+| `mode` | `"individual"` · `"group"` | `"individual"` | How matched elements are animated together |
+| `stagger` | CSS time string | — | `"individual"` mode only: cumulative delay per element |
 | `dur` | CSS time string | — | Overrides `--animate-duration` |
 | `delay` | CSS time string | — | Overrides `animation-delay` |
 
@@ -292,9 +294,26 @@ SVG elements by adding `data-ipe-animate` to a `<section>` or to a
 - **`"view-N"`** — fires at the N-th view step (1-based; view-1 = initial
   state, view-2 = first fragment step, etc.).
 
+**`"individual"` mode (default):** each matched element gets its own animation,
+all starting at the same time.  Add `"stagger"` to offset them:
+
+```json
+{ "sel": "[data-ipe-layer]", "anim": "fadeInLeft", "stagger": "0.1s" }
+```
+
+**`"group"` mode:** all matched elements are temporarily collected into a single
+`<g>` for the duration of the animation, so CSS percentage offsets (e.g. the
+`-100%` translate in `fadeInLeft`) and `transform-origin` are resolved against
+the combined bounding box of the whole group rather than each element
+individually:
+
+```json
+{ "sel": ".layer-alpha", "anim": "zoomIn", "mode": "group" }
+```
+
 You can also place `data-ipe-animate` directly on a hand-authored fragment
 span.  The `"on"` field is then ignored — all rules fire when that fragment
-is shown:
+is shown.  `mode` and `stagger` are supported here too:
 
 ```html
 <section data-ipe-page="4">
