@@ -4,8 +4,13 @@
  * Reads page/layer/view metadata from #ipe-meta, resolves <section> elements
  * to Ipe pages (by index, by title, or sequentially), fetches and injects the
  * per-page SVG, auto-fills missing view-fragment <span>s, drives layer
- * visibility as the presentation navigates, and fires animate.css animations
- * on layer elements at configurable trigger points.
+ * visibility as the presentation navigates, and fires animations on layer
+ * elements at configurable trigger points.
+ *
+ * Three animation backends are supported (mix freely within a presentation):
+ *   animate.css — simple named animations (fadeInLeft, zoomIn, …)
+ *   GSAP        — advanced tweens including MorphSVGPlugin, DrawSVGPlugin, …
+ *   script      — arbitrary JS callback for anything a single tween can't do
  *
  * Data attributes consumed:
  *   <div class="slides" data-ipe-no-auto-pages>  — suppress auto-appending sections for unclaimed pages
@@ -14,7 +19,7 @@
  *   <section data-ipe-page="Title">              — select page by title
  *   <section data-ipe-page="auto">               — assign the next not-yet-claimed page sequentially
  *   <section data-ipe-no-auto-views>             — disable view-fragment auto-fill for this slide
- *   <section data-ipe-animate='[...]'>           — animate.css rules for this slide (see below)
+ *   <section data-ipe-animate='[...]'>           — animation rules for this slide (see below)
  *   <span class="fragment ipe-view"
  *         data-visible-layers="a b c">           — hand-authored view fragment
  *   <span class="fragment ipe-view"
@@ -23,11 +28,32 @@
  * Animation rule format (JSON array on data-ipe-animate):
  *   [
  *     {
- *       "sel":   ".layer-alpha",   // CSS selector scoped to the slide's SVG (required)
- *       "anim":  "fadeInLeft",     // animate.css name without the animate__ prefix (required)
- *       "on":    "reveal",         // trigger: "reveal" | "slide" | "view-N" (default: "reveal")
- *       "dur":   "0.5s",           // optional: overrides --animate-duration
- *       "delay": "0.2s"            // optional: overrides animation-delay
+ *       "sel": ".layer-alpha",    // CSS selector scoped to the slide's SVG
+ *                                 //   required for anim/GSAP; optional for script
+ *       "on":  "reveal",          // trigger: "reveal"|"slide"|"view-N" (default: "reveal")
+ *
+ *       // — animate.css rule (simple animations) —
+ *       "anim":    "fadeInLeft",  // animate.css name without the animate__ prefix
+ *       "dur":     "0.5s",        // optional: overrides --animate-duration
+ *       "delay":   "0.2s",        // optional: overrides animation-delay
+ *       "mode":    "individual",  // "individual" (default) | "group"
+ *       "stagger": "0.08s",       // individual only: cumulative CSS delay per element
+ *
+ *       // — or — GSAP rule (advanced tweens, MorphSVG, DrawSVG, …) —
+ *       // Exactly one of from/to/fromTo identifies the tween method.
+ *       // Selector strings inside morphSVG / morphSVG.shape are automatically
+ *       // scoped to the slide's SVG.  Requires gsap (and any plugins) loaded
+ *       // before ipe-layers.js and registered with gsap.registerPlugin().
+ *       "from":    { "morphSVG": "path.src", "opacity": 0 },
+ *       "to":      { "x": 100, "opacity": 1 },
+ *       "fromTo":  [{ "opacity": 0 }, { "opacity": 1 }],
+ *       "duration": 0.5,          // top-level GSAP tween vars — merged into from/to/fromTo
+ *       "ease":    "power2.out",  // (any property GSAP accepts as tween vars)
+ *       "stagger":  0.08,         // numeric seconds, not a CSS time string
+ *
+ *       // — or — script rule (for anything a single tween cannot express) —
+ *       "script": "myScript",     // name passed to IpeLayers.registerScript()
+ *       "args":   { ... }         // forwarded verbatim to the callback
  *     }
  *   ]
  *
@@ -40,6 +66,13 @@
  *   "view-N"  — fires at the N-th view (1-based; view-1 = initial state,
  *               view-2 = first fragment, etc.).  May be combined with a
  *               selector to restrict which elements animate.
+ *   "conceal" — counterpart to "reveal": fires just before elements transition
+ *               from visible to hidden (on fragmenthidden).  Elements are still
+ *               visible when the rule fires, so reverse animations play against
+ *               a visible state while the layer system's CSS opacity transition
+ *               runs concurrently.  ctx.prevVisible contains the layers about to
+ *               be hidden; ctx.nextVisible contains the layers that will remain.
+ *               The selector is filtered to elements in newly-hidden layers.
  *
  * Trigger on <span data-ipe-animate>:
  *   The "on" field is ignored; all rules fire when the fragment is shown.
@@ -49,6 +82,9 @@
 
 const IpeLayers = (() => {
   'use strict';
+
+  // Registry for user-defined script animations (see registerScript below).
+  const scriptRegistry = new Map();
 
   // -------------------------------------------------------------------------
   // Metadata
@@ -431,6 +467,66 @@ const IpeLayers = (() => {
   }
 
   /**
+   * Resolve selector strings inside a GSAP vars object to DOM elements scoped
+   * to the section's SVG.  This prevents cross-slide collisions when multiple
+   * SVGs share the same class names.
+   *
+   * Only the `morphSVG` property is resolved — either as a plain selector
+   * string or as the `shape` property of an object shorthand.
+   */
+  function resolveGsapVars(vars, section) {
+    if (!vars || typeof vars !== 'object') return vars;
+    const out = { ...vars };
+    if (typeof out.morphSVG === 'string') {
+      out.morphSVG = section.querySelector(`svg ${out.morphSVG}`) ?? out.morphSVG;
+    } else if (out.morphSVG?.shape && typeof out.morphSVG.shape === 'string') {
+      out.morphSVG = { ...out.morphSVG,
+        shape: section.querySelector(`svg ${out.morphSVG.shape}`) ?? out.morphSVG.shape };
+    }
+    return out;
+  }
+
+  /**
+   * Dispatch a GSAP tween for the given elements using from/to/fromTo fields.
+   * Shared tween properties (duration, ease, stagger, …) sit at the rule's top
+   * level alongside the from/to/fromTo field; sel and on are stripped out.
+   */
+  function fireGsap(section, els, rule) {
+    if (!window.gsap) { console.warn('IpeLayers: GSAP not loaded'); return; }
+    if (!els.length) return;
+    // eslint-disable-next-line no-unused-vars
+    const { sel, on, from, to, fromTo, ...shared } = rule;
+    const targets = els.length === 1 ? els[0] : els;
+    if (fromTo !== undefined) {
+      const [fv, tv] = fromTo;
+      gsap.fromTo(targets, resolveGsapVars(fv, section),
+                  { ...shared, ...resolveGsapVars(tv, section) });
+    } else if (from !== undefined) {
+      gsap.from(targets, { ...shared, ...resolveGsapVars(from, section) });
+    } else {
+      gsap.to(targets, { ...shared, ...resolveGsapVars(to, section) });
+    }
+  }
+
+  /** Return elements matching rule.sel, filtered for reveal/conceal triggers. */
+  function selectEls(section, rule, trigger, prevVisible, nextVisible) {
+    if (!rule.sel) return [];
+    let els = [...section.querySelectorAll(`svg ${rule.sel}`)];
+    if (trigger === 'reveal') {
+      els = els.filter(el => {
+        const layer = el.getAttribute('data-ipe-layer');
+        return !layer || (!prevVisible.has(layer) && nextVisible.has(layer));
+      });
+    } else if (trigger === 'conceal') {
+      els = els.filter(el => {
+        const layer = el.getAttribute('data-ipe-layer');
+        return !layer || (prevVisible.has(layer) && !nextVisible.has(layer));
+      });
+    }
+    return els;
+  }
+
+  /**
    * Fire section-level animation rules that match `trigger`.
    * prevVisible / nextVisible are Sets of currently-visible layer names.
    *
@@ -440,22 +536,28 @@ const IpeLayers = (() => {
    */
   function fireRules(section, rules, trigger, prevVisible, nextVisible) {
     for (const rule of rules) {
-      if (!rule.anim || !rule.sel) continue;
       const on = rule.on ?? 'reveal';
       if (on !== trigger) continue;
 
-      let els = [...section.querySelectorAll(`svg ${rule.sel}`)];
-
-      if (trigger === 'reveal') {
-        els = els.filter(el => {
-          const layer = el.getAttribute('data-ipe-layer');
-          if (!layer) return true;
-          // Only animate elements whose layer just became visible.
-          return !prevVisible.has(layer) && nextVisible.has(layer);
-        });
+      if ('from' in rule || 'to' in rule || 'fromTo' in rule) {
+        fireGsap(section, selectEls(section, rule, trigger, prevVisible, nextVisible), rule);
+        continue;
       }
 
-      playAnimationForElements(els, rule);
+      if (rule.script) {
+        const fn = scriptRegistry.get(rule.script);
+        if (!fn) {
+          console.warn(`IpeLayers: no script registered for "${rule.script}"`);
+          continue;
+        }
+        fn(selectEls(section, rule, trigger, prevVisible, nextVisible),
+           rule, { section, trigger, prevVisible, nextVisible });
+        continue;
+      }
+
+      if (!rule.anim || !rule.sel) continue;
+      playAnimationForElements(
+        selectEls(section, rule, trigger, prevVisible, nextVisible), rule);
     }
   }
 
@@ -467,6 +569,21 @@ const IpeLayers = (() => {
   function fireFragmentRules(section, fragment) {
     const rules = parseAnimRules(fragment.dataset.ipeAnimate);
     for (const rule of rules) {
+      if ('from' in rule || 'to' in rule || 'fromTo' in rule) {
+        const els = rule.sel ? [...section.querySelectorAll(`svg ${rule.sel}`)] : [];
+        fireGsap(section, els, rule);
+        continue;
+      }
+      if (rule.script) {
+        const fn = scriptRegistry.get(rule.script);
+        if (!fn) {
+          console.warn(`IpeLayers: no script registered for "${rule.script}"`);
+          continue;
+        }
+        const els = rule.sel ? [...section.querySelectorAll(`svg ${rule.sel}`)] : [];
+        fn(els, rule, { section, trigger: 'fragment', prevVisible: new Set(), nextVisible: new Set() });
+        continue;
+      }
       if (!rule.anim || !rule.sel) continue;
       const els = [...section.querySelectorAll(`svg ${rule.sel}`)];
       playAnimationForElements(els, rule);
@@ -479,6 +596,25 @@ const IpeLayers = (() => {
 
   return {
     id: 'ipe-layers',
+
+    /**
+     * Register a named animation script for use in {"script": "name"} rules.
+     *
+     * fn(els, rule, ctx) is called when the rule's trigger fires:
+     *   els  — array of matched DOM elements (from rule.sel, filtered for "reveal")
+     *   rule — the full rule object, including rule.args for per-rule config
+     *   ctx  — { section, trigger, prevVisible: Set, nextVisible: Set }
+     *
+     * Scripts may use any animation library (SVG.js, GSAP, anime.js, …).
+     * Because Cairo bakes a Y-flip + translation into each element's SVG
+     * transform attribute, CSS transforms applied to those elements will
+     * conflict with it.  Libraries that modify the SVG transform attribute
+     * directly (e.g. SVG.js with relative: true) or that only change other
+     * attributes (e.g. path morphing via plot()) are not affected.
+     */
+    registerScript(name, fn) {
+      scriptRegistry.set(name, fn);
+    },
 
     async init(deck) {
       let meta;
@@ -612,10 +748,17 @@ const IpeLayers = (() => {
         const pageInfo = sectionPageMap.get(section);
         if (!pageInfo) return;
 
-        const layersStr = currentLayers(section, pageInfo);
+        const prevVisible = layersState.get(section) ?? new Set();
+        const layersStr   = currentLayers(section, pageInfo);
+        const nextVisible = new Set(layersStr.trim().split(/\s+/).filter(Boolean));
+
+        // "conceal" fires BEFORE applyLayers so elements are still visible
+        // when reverse animations start.
+        const sectionRules = parseAnimRules(section.dataset.ipeAnimate);
+        fireRules(section, sectionRules, 'conceal', prevVisible, nextVisible);
+
         applyLayers(section, pageInfo, layersStr);
-        layersState.set(section,
-          new Set(layersStr.trim().split(/\s+/).filter(Boolean)));
+        layersState.set(section, nextVisible);
       });
     },
   };

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE ipe SYSTEM "ipe.dtd">
 <ipe version="70218" creator="Ipe 7.2.28">
-<info created="D:20090429144355" modified="D:20260330132436" title="Partial Level Planarity Parameterized by |Missing Graph|" author="Simon D. Fink" numberpages="yes"/>
+<info created="D:20090429144355" modified="D:20260331225447" title="Partial Level Planarity Parameterized by |Missing Graph|" author="Simon D. Fink" numberpages="yes"/>
 <preamble>\usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
 \usepackage{marvosym}
@@ -15,11 +15,11 @@
 \newcommand{\itemcolor}{ac-lightblue}
 \newcommand{\name}{Simon D. Fink}
 \newcommand{\prestitle}{Partial Level Planarity Parameterized by $|$Missing Graph$|$}
-  
+
 \newcommand{\probname}[1]{\normalfont\textsc{#1}}
 \newcommand{\SLE}{\probname{Stack Layout Extension}\xspace}
 \newcommand{\SLEShort}{\probname{SLE}\xspace}
-\newcommand{\lSL}[1]{\ifthenelse {\equal{#1}{}} 
+\newcommand{\lSL}[1]{\ifthenelse {\equal{#1}{}}
 {\ensuremath{\langle\prec,\sigma\rangle}}%
 {\ensuremath{\langle\prec_{#1},\sigma_{#1}\rangle}}}
 \newcommand{\Size}[1]{\ensuremath{\left\vert #1 \right\vert}}
@@ -747,9 +747,9 @@ h
     \usepackage[utf8]{inputenc}
 	\usepackage[vlined]{algorithm2e}
 	\DontPrintSemicolon
-	
 
-    
+
+
     % language settings
     \newif\ifgerman%
     \newcommand{\german}{\germantrue}%
@@ -766,7 +766,7 @@ h
 	\newcommand{\kitlogo}{}
 	\newcommand{\chair}{}
 	\newcommand{\helmholz}{}
-	
+
 	\newcommand{\algoinst}{%
       \ifgerman%
       {\sc Institut für Theoretische Informatik $\cdot$
@@ -782,7 +782,7 @@ h
       \chair%
       \else%
       Institute of Theoretical Informatics\\
-      \chair% 
+      \chair%
       \fi%
     }%
 
@@ -1102,7 +1102,7 @@ h
 		\usepackage{tikz}
 		\usetikzlibrary{shapes.misc}
 		\setlist[itemize,1]{label={\tikz{\fill[rounded corners=0.6pt, fill=\itemcolor] (0, 0) rectangle (0.2, 0.2) {};}}}
-		\setlist[itemize,2]{label={\tikz{\fill[rounded corners=0.6pt, fill=\itemcolor] (0, 0) rectangle (0.18, 0.18) {};}}}	
+		\setlist[itemize,2]{label={\tikz{\fill[rounded corners=0.6pt, fill=\itemcolor] (0, 0) rectangle (0.18, 0.18) {};}}}
 		\setlist[itemize,3]{label={\tikz{\fill[rounded corners=0.6pt, fill=\itemcolor] (0, 0) rectangle (0.15, 0.15) {};}}}
 	</preamble>
 </ipestyle>
@@ -5558,11 +5558,11 @@ h
 768 416 m
 704 448 l
 </path>
-<path layer="edgeB" matrix="1.5 0 0 1.5 -444 -176" stroke="black" pen="heavier">
+<path layer="edgeB" matrix="1.5 0 0 1.5 -444 -176" custom="edge1" stroke="black" pen="heavier">
 704 320 m
 768 416 l
 </path>
-<path layer="edgeA" matrix="1.5 0 0 1.5 -444 -176" stroke="black" pen="heavier">
+<path layer="edgeA" matrix="1.5 0 0 1.5 -444 -176" custom="edge3" stroke="black" pen="heavier">
 704 448 m
 784 352 l
 </path>
@@ -5583,7 +5583,7 @@ h
 698.112 384 m
 704 448 l
 </path>
-<path layer="beta" matrix="1.5 0 0 1.5 -444 -176" stroke="black" pen="heavier">
+<path layer="beta" matrix="1.5 0 0 1.5 -444 -176" custom="edge2" stroke="black" pen="heavier">
 704 320 m
 631.094 340.489
 631.783 363.555
@@ -5600,7 +5600,7 @@ h
 704 320 m
 768 416 l
 </path>
-<path layer="gamma" matrix="1.5 0 0 1.5 -444 -176" stroke="black" pen="heavier">
+<path layer="gamma" matrix="1.5 0 0 1.5 -444 -176" custom="edge4" stroke="black" pen="heavier">
 784 352 m
 793.028 375.874
 794.088 422.513
@@ -7173,7 +7173,7 @@ h
 
 
 
-\item  B. Randerath,  E. Speckenmeyer,  E Boros,  P. L. Hammer,  A. Kogan, K. Makino, B. Simeone, and O. Cepek.  
+\item  B. Randerath,  E. Speckenmeyer,  E Boros,  P. L. Hammer,  A. Kogan, K. Makino, B. Simeone, and O. Cepek.
 A satisfiability formulation  of  problems  on  level  graphs.
 \textit{Electron.  Notes  Discret.  Math.},  9:269–277, 2001.
 
@@ -7326,6 +7326,7 @@ h
 <view layers="alpha gamma zeta eta iota lambda" active="iota"/>
 <view layers="alpha gamma zeta eta iota kappa lambda" active="kappa"/>
 <view layers="alpha gamma zeta eta iota kappa lambda mu" active="mu"/>
+<view layers="alpha gamma zeta eta iota kappa lambda mu nu" active="nu"/>
 <view layers="alpha gamma zeta eta iota kappa lambda mu nu" active="nu"/>
 <path layer="zeta" matrix="0.934546 0 0 1 13.8471 221.595" stroke="CB dark green" fill="1" pen="heavier">
 160 368 m
@@ -8153,7 +8154,7 @@ h
 140 212 l
 140 204 l
 </path>
-<path matrix="0.931061 0 0 0.8 -476.304 554" stroke="black" fill="white" pen="heavier" cap="2" join="1">
+<path matrix="0.931061 0 0 0.8 -476.304 554" custom="box" stroke="black" fill="white" pen="heavier" cap="2" join="1">
 1040 80 m
 1040 -80 l
 1264 -80 l

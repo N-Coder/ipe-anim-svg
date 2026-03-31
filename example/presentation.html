@@ -37,8 +37,12 @@ here</aside>
     </section>
     <!-- fragment-span annotation: graph + edges zoom in as a group (group mode:
          the zoom pivots from their combined centre, not each element's own centre);
-         remaining views are auto-filled by the plugin -->
-    <section data-ipe-page="3">
+         remaining views are auto-filled by the plugin.
+         GSAP morphSVG rules: custom-edge2 and custom-edge4 each morph in from the
+         shape of their predecessor when they are first revealed (gsap.from snaps
+         dest to src's shape then animates dest back to its own shape). -->
+    <section data-ipe-page="3"
+             data-ipe-animate='[{"sel":"path.custom-edge2","on":"reveal","from":{"morphSVG":"path.custom-edge1"},"duration":0.5},{"sel":"path.custom-edge4","on":"reveal","from":{"morphSVG":"path.custom-edge3"},"duration":0.5}]'>
       <span class="fragment ipe-view"
             data-visible-layers="alpha graph edgeA edgeB edgeC"
             data-ipe-animate='[{"sel": ":is(.layer-graph, .layer-edgeA, .layer-edgeB, .layer-edgeC)", "anim": "zoomIn", "dur": "0.5s", "mode": "group"}]'></span>
@@ -55,10 +59,17 @@ here</aside>
     <section data-ipe-page="5"></section>  <!-- Proper Level Planarity via SAT -->
     <section data-ipe-page="6"></section>  <!-- Proper PLP is FPT by \# missing vertices $n_\text{add}$ -->
     <section data-ipe-page="7"></section>  <!-- Proper Partial Level Planarity via SAT -->
-    <section data-ipe-page="8"></section>  <!-- Overview -->
-    <!-- "view-N" trigger: layer zeta gets a bounce when it appears at view-6 -->
+    <!-- script rules: when layer nu is revealed (view-8), all .layer-nu elements
+         are collected into a wrapper <g> and GSAP slides the group to the
+         upper-right corner; the "conceal" rule reverses the slide when stepping
+         backward past that view. -->
+    <section data-ipe-page="8"
+             data-ipe-animate='[{"script":"moveToCorner","sel":".layer-nu","on":"reveal","args":{"dx":34,"dy":-344,"duration":0.6}},{"script":"moveToCorner","on":"conceal","args":{"duration":0.6}}]'></section>  <!-- Overview -->
+    <!-- "view-N" trigger: layer zeta gets a bounce when it appears at view-6;
+         GSAP DrawSVG rule: each newly-revealed stroke path draws itself onto the
+         screen via stroke-dashoffset as layers are stepped through one by one -->
     <section data-ipe-page="9"
-             data-ipe-animate='[{"sel": ".layer-zeta", "anim": "bounceIn", "on": "view-6"}]'></section>  <!-- Biconnected PLP is FPT by VEDD -->
+             data-ipe-animate='[{"sel":".layer-zeta","anim":"bounceIn","on":"view-6"},{"sel":"[data-ipe-layer]","on":"reveal","from":{"drawSVG":"0%"},"duration":0.6}]'></section>  <!-- Biconnected PLP is FPT by VEDD -->
     <section data-ipe-page="10"></section>  <!-- Tractable Fragments of Partial Level Planarity -->
     <section data-ipe-page="11">
 
@@ -72,12 +83,62 @@ here</aside>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@6/dist/reveal.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@6/dist/plugin/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/MorphSVGPlugin.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/DrawSVGPlugin.min.js"></script>
 <script src="ipe-layers.js"></script>
 <script>
+gsap.registerPlugin(MorphSVGPlugin, DrawSVGPlugin);
+
 Reveal.initialize({
   hash: true,
   transition: 'fade',
   plugins: [RevealNotes, IpeLayers],
+});
+
+// Move a set of elements to the upper-right corner of the slide by wrapping
+// them in a <g> and tweening the group's translation.  Using a plain wrapper
+// <g> (no pre-existing transform) lets GSAP write its translate freely without
+// conflicting with Cairo's per-element matrix(1,0,0,-1,tx,ty) Y-flip.
+// SVG clip-paths on text elements stay correct because clipPathUnits="userSpaceOnUse"
+// evaluates coordinates in the element's local (wrapper-relative) coordinate
+// system, so the clips move together with the content.
+//
+// Two rules are needed — one per trigger:
+//   {"script":"moveToCorner","sel":".layer-X","on":"reveal","args":{...}}
+//   {"script":"moveToCorner","on":"conceal","args":{...}}
+//
+//   rule.args.dx        horizontal shift in SVG viewBox units (only for reveal)
+//   rule.args.dy        vertical shift in SVG viewBox units (only for reveal)
+//   rule.args.duration  tween duration in seconds (default: 0.6)
+//   rule.args.ease      GSAP ease string (default: "power2.inOut")
+IpeLayers.registerScript('moveToCorner', (els, rule, ctx) => {
+  if (!window.gsap) { console.warn('IpeLayers: GSAP not loaded'); return; }
+
+  const svg = ctx.section.querySelector('svg');
+  const dur  = rule.args?.duration ?? 0.6;
+  const ease = rule.args?.ease ?? 'power2.inOut';
+
+  if (ctx.trigger === 'conceal') {
+    // Reverse: animate wrapper back to the origin.  "conceal" fires before
+    // applyLayers, so the elements are still visible at animation start.
+    const wrapper = svg.querySelector('.ipe-corner-wrapper');
+    if (wrapper) gsap.to(wrapper, { x: 0, y: 0, duration: dur, ease });
+    return;
+  }
+
+  // Forward (reveal): wrap elements and slide to corner.
+  if (!els.length) return;
+  let wrapper = svg.querySelector('.ipe-corner-wrapper');
+  if (!wrapper) {
+    wrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    wrapper.classList.add('ipe-corner-wrapper');
+    els[0].parentNode.insertBefore(wrapper, els[0]);
+    els.forEach(el => wrapper.appendChild(el));
+  }
+  const dx = rule.args?.dx ?? 34;
+  const dy = rule.args?.dy ?? -344;
+  gsap.fromTo(wrapper, { x: 0, y: 0 }, { x: dx, y: dy, duration: dur, ease });
 });
 </script>
 

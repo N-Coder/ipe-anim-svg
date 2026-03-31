@@ -1,10 +1,18 @@
 # ipe-svg
 
 Convert [Ipe](https://ipe.otfried.org/) presentations to interactive and animated,
-statically-hostable [reveal.js](https://revealjs.com/) websites.
+statically-hostable [reveal.js](https://revealjs.com/) websites. Core features:
+- present any ipe file in your browser -- from a USB-stick or your own HTTP server
+- built-in speaker view with notes, timer and slide preview
+- all other features of [reveal.js](https://revealjs.com/) like synchronized casting to attendees' screens
+- simple animations with [animate.css](https://animate.style/) like appearance transitions or attention-grabbers
+- advanced animations with [GSAP](https://gsap.com) like path tweening, animated drawing and custom morphs
+- the full power of your browser: embed youtube videos, interactive plots, world maps, anything!
 
-Each Ipe page becomes a reveal.js slide. Views within a page (the incremental build-up of layers) become fragment steps.
+Each Ipe page becomes a reveal.js slide with your drawing as SVG.
+Views within a page (the incremental build-up of layers) become fragment steps.
 The resulting site requires no specialized software — just a browser.
+Metadata from the ipe file is preserved, so you can easily annotate your animations in the HTML file.
 See the `example/` folder for a demo that is also available live on GitHub Pages [here](https://n-coder.github.io/ipe-anim-svg/example/presentation.html).
 
 ---
@@ -321,6 +329,90 @@ is shown.  `mode` and `stagger` are supported here too:
         data-visible-layers="result"
         data-ipe-animate='[{ "sel": ".layer-result", "anim": "zoomIn" }]'></span>
 </section>
+```
+
+### GSAP animations
+
+For advanced animations — path morphing, stroke draw-on, custom easing, complex
+timelines — use GSAP's `from`/`to`/`fromTo` keys directly in a rule.
+The plugin detects these and dispatches to `gsap.from()`, `gsap.to()`, or
+`gsap.fromTo()`.  All other fields at the rule's top level pass through as GSAP
+tween vars (`duration`, `ease`, `stagger`, …).
+
+```html
+<!-- Load GSAP + plugins before ipe-layers.js -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/MorphSVGPlugin.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/DrawSVGPlugin.min.js"></script>
+<script src="ipe-layers.js"></script>
+<script>
+gsap.registerPlugin(MorphSVGPlugin, DrawSVGPlugin);
+Reveal.initialize({ plugins: [IpeLayers] });
+</script>
+```
+
+**Path morphing** — `gsap.from(dest, {morphSVG: src})` snaps `dest` to `src`'s
+shape then animates `dest` back to its own shape; no reset is needed:
+
+```html
+<section data-ipe-page="3" data-ipe-animate='[
+  {"sel":"path.custom-edge2","on":"reveal","from":{"morphSVG":"path.custom-edge1"},"duration":0.5},
+  {"sel":"path.custom-edge4","on":"reveal","from":{"morphSVG":"path.custom-edge3"},"duration":0.5}
+]'>
+```
+
+`morphSVG` selector strings are automatically resolved to DOM elements scoped
+to the slide's `<svg>`, preventing cross-slide collisions when multiple pages
+share the same class names.
+
+**Stroke draw-on** — DrawSVG animates `stroke-dashoffset` from `"0%"` (hidden)
+to the full path length:
+
+```html
+<section data-ipe-page="9" data-ipe-animate='[
+  {"sel":"[data-ipe-layer]","on":"reveal","from":{"drawSVG":"0%"},"duration":0.6}
+]'>
+```
+
+**fromTo** — pass `[fromVars, toVars]` for explicit start and end states:
+
+```json
+{"sel":".layer-foo","fromTo":[{"opacity":0},{"opacity":1}],"duration":0.4}
+```
+
+**GSAP stagger** is numeric seconds (unlike animate.css `stagger` which is a CSS
+time string):
+
+```json
+{"sel":"[data-ipe-layer]","on":"reveal","from":{"opacity":0},"duration":0.3,"stagger":0.08}
+```
+
+**Transform note:** Cairo bakes a Y-flip into every SVG element's `transform`
+attribute.  GSAP animations that modify the `transform` attribute (position,
+scale, rotation) will conflict with it.  Attribute-only tweens are safe:
+`morphSVG` (modifies path `d`), `drawSVG` (modifies `stroke-dashoffset`),
+`opacity`, `fill`, `stroke`, etc.
+
+### Custom script animations
+
+For anything that cannot be expressed as a GSAP tween, use `"script"` and
+register a handler with `IpeLayers.registerScript(name, fn)`:
+
+```html
+<script>
+IpeLayers.registerScript('myEffect', (els, rule, ctx) => {
+  // els — matched elements (reveal-filtered for "reveal" trigger)
+  // rule.args — per-rule config object
+  // ctx.section — the slide's <section> element
+  // ctx.prevVisible / ctx.nextVisible — Set<string> of layer names
+});
+</script>
+```
+
+```html
+<section data-ipe-page="5"
+         data-ipe-animate='[{"script":"myEffect","sel":".layer-foo","on":"reveal",
+                             "args":{"speed":0.5}}]'>
 ```
 
 ### Changing the theme and transition
